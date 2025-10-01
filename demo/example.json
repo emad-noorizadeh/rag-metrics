@@ -1,0 +1,31 @@
+{
+    "question": "What was the 2023 revenue and guidance?",
+    "answer": "Revenue was $5.2B and guidance is 12% growth.",
+    "context": [
+        "In 2023, the company reported revenue of $5.2B.",
+        "Management expects growth of 12 percent next year."
+    ],
+    "metrics_config": {
+        "unsupported_to_supported_ratio": true,
+        "supported_topk_impact": true,
+        "avg_ctx_len_tokens": true,
+        "p90_sentence_precision": true,
+        "unsupported_term_count": true,
+        "unsupported_topk_count": true,
+        "unsupported_numeric_count": true,
+        "unsupported_entity_count": true,
+        "best_context_len": true,
+        "best_context_share": true,
+        "num_contexts": true,
+        "q_len": true,
+        "a_len": true,
+        "qa_len_ratio": true,
+        "money_cov": true,
+        "number_cov": true,
+        "percent_cov": true,
+        "date_cov": true,
+        "quantity_cov": true,
+        "min_sentence_precision": true,
+        "mean_sentence_precision": true
+    }
+}

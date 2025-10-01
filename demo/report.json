@@ -1,0 +1,150 @@
+{
+  "precision_token": 0.7375,
+  "recall_context": 0.4163,
+  "numeric_match": 1.0,
+  "entity_match": {
+    "overall": 1.0,
+    "by_type": {
+      "MONEY": 1.0,
+      "NUMBER": 1.0
+    },
+    "unsupported": []
+  },
+  "supported_entities": {
+    "items": [
+      {
+        "type": "MONEY",
+        "text": "$5.2",
+        "start": 12,
+        "end": 16
+      },
+      {
+        "type": "NUMBER",
+        "text": "5.2B",
+        "start": 13,
+        "end": 17
+      },
+      {
+        "type": "NUMBER",
+        "text": "12",
+        "start": 34,
+        "end": 36
+      }
+    ],
+    "by_type": {
+      "MONEY": 1,
+      "NUMBER": 2
+    },
+    "count": 3
+  },
+  "supported_terms": [
+    {
+      "term": "5.2b",
+      "count": 1,
+      "idf": 1.5108
+    },
+    {
+      "term": "growth",
+      "count": 1,
+      "idf": 1.5108
+    },
+    {
+      "term": "revenue",
+      "count": 1,
+      "idf": 1.2231
+    }
+  ],
+  "supported_terms_per_sentence": [
+    {
+      "sentence": "Revenue was $5.2B and guidance is 12% growth.",
+      "supported_terms": [
+        {
+          "term": "revenue",
+          "start": 0,
+          "end": 7
+        },
+        {
+          "term": "5.2b",
+          "start": 13,
+          "end": 17
+        },
+        {
+          "term": "growth",
+          "start": 38,
+          "end": 44
+        }
+      ]
+    }
+  ],
+  "per_sentence": [
+    0.7375
+  ],
+  "qr_alignment": {
+    "cosine_tfidf": 0.4792,
+    "answer_covers_question": 0.5879,
+    "cosine_embed": null,
+    "answer_covers_question_sem": null
+  },
+  "context_alignment": {
+    "answer_context_similarity": null,
+    "best_context_similarity": null
+  },
+  "unsupported_terms": [
+    {
+      "term": "guidance",
+      "count": 1,
+      "idf": 1.5108,
+      "impact": 1.5108
+    }
+  ],
+  "unsupported_terms_per_sentence": [
+    {
+      "sentence": "Revenue was $5.2B and guidance is 12% growth.",
+      "unsupported_terms": [
+        {
+          "term": "guidance",
+          "count": 1,
+          "idf": 1.5108,
+          "impact": 1.5108
+        }
+      ]
+    }
+  ],
+  "unsupported_numbers": [],
+  "summary": "73.8% grounded; 41.6% best-context recall; 100.0% numeric; 100.0% entity; Q↔A tfidf 0.48.",
+  "unsupported_term_count": 1.0,
+  "unsupported_topk_count": 1.0,
+  "supported_topk_impact": 1.5108,
+  "unsupported_to_supported_ratio": 1.0,
+  "unsupported_numeric_count": 0.0,
+  "unsupported_entity_count": 0.0,
+  "best_context_len": 4.0,
+  "best_context_share": 0.3071,
+  "num_contexts": 2.0,
+  "avg_ctx_len_tokens": 8.0,
+  "q_len": 3.0,
+  "a_len": 4.0,
+  "qa_len_ratio": 1.3333,
+  "money_cov": 1.0,
+  "number_cov": 1.0,
+  "percent_cov": 0.0,
+  "date_cov": 0.0,
+  "quantity_cov": 0.0,
+  "min_sentence_precision": 0.7375,
+  "mean_sentence_precision": 0.7375,
+  "p90_sentence_precision": 0.7375,
+  "unsupported_mass": 0.2625,
+  "unsupported_topk_impact": 1.5108,
+  "unsupported_topk_terms": [
+    {
+      "term": "guidance",
+      "count": 1,
+      "idf": 1.5108,
+      "impact": 1.5108
+    }
+  ],
+  "unsupported_term_rate": 0.25,
+  "hallucination_risk_score": 0.2625,
+  "unsupported_numeric_rate": 0.0,
+  "unsupported_entity_mass": 0.0
+}

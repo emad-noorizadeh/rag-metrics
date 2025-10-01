@@ -486,12 +486,16 @@ def context_utilization_report_with_entities(
     use_bm25_for_best: bool = True,
     use_embed_alignment: bool = False,    # set True if sentence-transformers installed
     embed_term_threshold: float = 0.5,
-    extractor_config: Optional[ExtractorConfig] = None
+    extractor_config: Optional[ExtractorConfig] = None,
+    metrics_config: Optional[Dict[str, bool]] = None
 ) -> Dict[str, Any]:
     """
     Advanced context utilization analysis with typed entity extraction and sentence similarity.
     QUANTITY extraction is regex+unit-table (no sklearn/quantulum3).
     """
+
+    def _is_enabled(cfg: Optional[Dict[str, bool]], name: str, default: bool = True) -> bool:
+        return default if cfg is None else bool(cfg.get(name, default))
     # Build extractor config (or use default)
     ex_cfg = extractor_config or ExtractorConfig(
         enable_money=True,
@@ -602,6 +606,17 @@ def context_utilization_report_with_entities(
         p = _weighted_precision(s_terms, all_ctx_terms, idf) if s_terms else 0.0
         per_sentence.append(round(p, 4))
 
+    # Per-sentence summary features (quick-win)
+    min_sentence_precision = min(per_sentence) if per_sentence else 0.0
+    mean_sentence_precision = (sum(per_sentence) / len(per_sentence)) if per_sentence else 0.0
+    # p90
+    if per_sentence:
+        sorted_ps = sorted(per_sentence)
+        idx90 = int(0.9 * (len(sorted_ps) - 1))
+        p90_sentence_precision = sorted_ps[idx90]
+    else:
+        p90_sentence_precision = 0.0
+
     # ---- Q↔A alignment
     vq, va = _tfidf_vector(q_terms, idf), _tfidf_vector(a_terms, idf)
     qr_cosine = _cosine(vq, va)
@@ -630,6 +645,69 @@ def context_utilization_report_with_entities(
         entity_match,
         topk=5,
     )
+
+    # ---- Quick-win features (conditionally included)
+    quickwin = {}
+    # 1) Unsupported footprint size
+    if _is_enabled(metrics_config, "unsupported_term_count"):
+        quickwin["unsupported_term_count"] = float(len(unsupported))
+    if _is_enabled(metrics_config, "unsupported_topk_count"):
+        quickwin["unsupported_topk_count"] = float(len(extras.get("unsupported_topk_terms", []) or []))
+    # 2) Supported vs unsupported mass balance (use same top-k K as in extras)
+    if _is_enabled(metrics_config, "supported_topk_impact") or _is_enabled(metrics_config, "unsupported_to_supported_ratio"):
+        K = len(extras.get("unsupported_topk_terms", []) or [])
+        if K > 0:
+            # supported_terms is a list of {term,count,idf}
+            sup_sorted = sorted(supported_terms, key=lambda x: -(x.get("idf", 1.0) * x.get("count", 1)))
+            supported_topk_impact = sum((it.get("idf", 1.0) * it.get("count", 1)) for it in sup_sorted[:K])
+        else:
+            supported_topk_impact = 0.0
+        if _is_enabled(metrics_config, "supported_topk_impact"):
+            quickwin["supported_topk_impact"] = round(float(supported_topk_impact), 4)
+        if _is_enabled(metrics_config, "unsupported_to_supported_ratio"):
+            uns_topk = float(extras.get("unsupported_topk_impact", 0.0) or 0.0)
+            quickwin["unsupported_to_supported_ratio"] = round(uns_topk / (supported_topk_impact + 1e-6), 4)
+    # 3) Numeric/entity mismatch counts
+    if _is_enabled(metrics_config, "unsupported_numeric_count"):
+        quickwin["unsupported_numeric_count"] = float(len(unsupported_nums))
+    if _is_enabled(metrics_config, "unsupported_entity_count"):
+        quickwin["unsupported_entity_count"] = float(len(entity_match.get("unsupported", []) or []))
+    # 4) Best-context alignment proxy and volume
+    if _is_enabled(metrics_config, "best_context_len"):
+        quickwin["best_context_len"] = float(len(best_ctx_terms))
+    if _is_enabled(metrics_config, "best_context_share"):
+        quickwin["best_context_share"] = round(float(precision_token * recall_context), 4)
+    if _is_enabled(metrics_config, "num_contexts"):
+        quickwin["num_contexts"] = float(len(retrieved_contexts or []))
+    if _is_enabled(metrics_config, "avg_ctx_len_tokens"):
+        avg_ctx_len_tokens = 0.0
+        if ctx_tokens_list:
+            total = sum(len(toks) for toks in ctx_tokens_list)
+            avg_ctx_len_tokens = total / len(ctx_tokens_list)
+        quickwin["avg_ctx_len_tokens"] = round(float(avg_ctx_len_tokens), 4)
+    # 5) QA lexical alignment extras
+    if _is_enabled(metrics_config, "q_len"):
+        quickwin["q_len"] = float(len(q_terms))
+    if _is_enabled(metrics_config, "a_len"):
+        quickwin["a_len"] = float(len(a_terms))
+    if _is_enabled(metrics_config, "qa_len_ratio"):
+        quickwin["qa_len_ratio"] = round(float(len(a_terms) / max(1, len(q_terms))), 4)
+    # 6) Entity-type coverage shape (defaults to 0.0 if missing)
+    by_type_cov = (entity_match.get("by_type", {}) if entity_match else {})
+    def _bt(name):
+        return float(by_type_cov.get(name, 0.0) or 0.0)
+    if _is_enabled(metrics_config, "money_cov"):    quickwin["money_cov"] = _bt("MONEY")
+    if _is_enabled(metrics_config, "number_cov"):   quickwin["number_cov"] = _bt("NUMBER")
+    if _is_enabled(metrics_config, "percent_cov"):  quickwin["percent_cov"] = _bt("PERCENT")
+    if _is_enabled(metrics_config, "date_cov"):     quickwin["date_cov"] = _bt("DATE")
+    if _is_enabled(metrics_config, "quantity_cov"): quickwin["quantity_cov"] = _bt("QUANTITY")
+    # 7) Per-sentence summary stats
+    if _is_enabled(metrics_config, "min_sentence_precision"):
+        quickwin["min_sentence_precision"] = round(float(min_sentence_precision), 4)
+    if _is_enabled(metrics_config, "mean_sentence_precision"):
+        quickwin["mean_sentence_precision"] = round(float(mean_sentence_precision), 4)
+    if _is_enabled(metrics_config, "p90_sentence_precision"):
+        quickwin["p90_sentence_precision"] = round(float(p90_sentence_precision), 4)
 
     # ---- Summary
     pct = round(precision_token * 100, 1)
@@ -668,11 +746,16 @@ def context_utilization_report_with_entities(
         "unsupported_terms_per_sentence": unsupported_ps,
         "unsupported_numbers": unsupported_nums,
         "summary": summary,
+        **quickwin,
         **extras,
     }
 
 # wrapper for context_utilization_report_with_entities
-def calculate_context_utilization_percentage(answer: str, context_snippets: List[str]) -> Dict[str, Any]:
+def calculate_context_utilization_percentage(
+    answer: str,
+    context_snippets: List[str],
+    metrics_config: Optional[Dict[str, bool]] = None
+) -> Dict[str, Any]:
     return context_utilization_report_with_entities(
         question="",
         answer=answer,
@@ -680,6 +763,7 @@ def calculate_context_utilization_percentage(answer: str, context_snippets: List
         use_bm25_for_best=True,
         use_embed_alignment=False,
         extractor_config=None,  # or pass a custom ExtractorConfig
+        metrics_config=metrics_config,
     )
 
 # -------------------------
