@@ -420,6 +420,61 @@ def _unsupported_terms_per_sentence(answer: str, ctx_terms_all: List[str], idf: 
         out.append({"sentence": sent, "unsupported_terms": items})
     return out
 
+
+def _compute_unsupported_extras(
+    answer_terms: List[str],
+    unsupported: List[Dict[str, Any]],
+    precision_token: Optional[float],
+    numeric_match: Optional[float],
+    entity_match: Dict[str, Any],
+    topk: int = 5,
+) -> Dict[str, Any]:
+    """Compute the six requested unsupported metrics.
+
+    - unsupported_mass = 1 - precision_token
+    - unsupported_topk_impact = sum(idf*count) for top-K unsupported terms
+    - unsupported_term_rate = |{unsupported unique terms}| / |{unique answer terms}|
+    - hallucination_risk_score = unsupported_mass (without POS filtering)
+    - unsupported_numeric_rate = 1 - numeric_match
+    - unsupported_entity_mass = 1 - entity_match.overall
+    """
+    # Unsupported Mass (%): relies directly on precision_token
+    if precision_token is None:
+        unsupported_mass = None
+    else:
+        unsupported_mass = max(0.0, min(1.0, 1.0 - float(precision_token)))
+
+    # Unsupported Top-K Impact
+    topk_terms = unsupported[: max(0, int(topk))]
+    topk_impact = sum(u.get("impact", 0.0) for u in topk_terms)
+
+    # Unsupported Term Rate
+    uniq_answer_terms = set(answer_terms)
+    uniq_unsupported_terms = {u.get("term") for u in unsupported}
+    unsupported_term_rate = (
+        (len(uniq_unsupported_terms) / max(1, len(uniq_answer_terms))) if uniq_answer_terms else 0.0
+    )
+
+    # Hallucination Risk Score (no POS filter -> equals unsupported_mass)
+    hallucination_risk_score = unsupported_mass
+
+    # Unsupported-Numeric Rate
+    unsupported_numeric_rate = None if numeric_match is None else max(0.0, min(1.0, 1.0 - float(numeric_match)))
+
+    # Unsupported-Entity Mass
+    overall_ent = None if not entity_match else entity_match.get("overall")
+    unsupported_entity_mass = None if overall_ent is None else max(0.0, min(1.0, 1.0 - float(overall_ent)))
+
+    return {
+        "unsupported_mass": None if unsupported_mass is None else round(unsupported_mass, 4),
+        "unsupported_topk_impact": round(float(topk_impact), 4),
+        "unsupported_topk_terms": topk_terms,
+        "unsupported_term_rate": round(float(unsupported_term_rate), 4),
+        "hallucination_risk_score": None if hallucination_risk_score is None else round(float(hallucination_risk_score), 4),
+        "unsupported_numeric_rate": None if unsupported_numeric_rate is None else round(float(unsupported_numeric_rate), 4),
+        "unsupported_entity_mass": None if unsupported_entity_mass is None else round(float(unsupported_entity_mass), 4),
+    }
+
 # -------------------------
 # Main advanced function
 # -------------------------
@@ -567,6 +622,14 @@ def context_utilization_report_with_entities(
     unsupported = _unsupported_terms(a_terms, all_ctx_terms, idf)
     unsupported_ps = _unsupported_terms_per_sentence(answer, all_ctx_terms, idf)
     unsupported_nums = _unsupported_numbers(answer, retrieved_contexts, config=ex_cfg)
+    extras = _compute_unsupported_extras(
+        a_terms,
+        unsupported,
+        precision_token,
+        numeric_match,
+        entity_match,
+        topk=5,
+    )
 
     # ---- Summary
     pct = round(precision_token * 100, 1)
@@ -604,7 +667,8 @@ def context_utilization_report_with_entities(
         "unsupported_terms": unsupported,
         "unsupported_terms_per_sentence": unsupported_ps,
         "unsupported_numbers": unsupported_nums,
-            "summary": summary
+        "summary": summary,
+        **extras,
     }
 
 # wrapper for context_utilization_report_with_entities
