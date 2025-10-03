@@ -132,33 +132,91 @@ toy_data: Dataset = [
 # ----------------------------------------------------------
 # 2) Generic feature flattener over the report (no new deps)
 # ----------------------------------------------------------
+
+import numpy as np
+from typing import Any, Dict, Iterable
+import fnmatch
+
 def _is_number(x: Any) -> bool:
-    return isinstance(x, (int, float)) and not (isinstance(x, float) and (np.isnan(x) or np.isinf(x)))
+    # Exclude bools (bool is subclass of int) and bad floats
+    return (isinstance(x, (int, float))
+            and not isinstance(x, bool)
+            and not (isinstance(x, float) and (np.isnan(x) or np.isinf(x))))
 
 def _flatten_report(
     rep: Dict[str, Any],
     prefix: str = "",
     include_list_lengths: bool = True,
+    include_numeric_list_stats: bool = True,
+    include_boolean_allowlist: Iterable[str] = (),   # NEW: dotted-path or glob allowlist for booleans
 ) -> Dict[str, float]:
     """
     Recursively flatten the report dict, keeping only numeric scalars.
-    For lists: optionally add a '<key>__len' feature.
-    For nested dicts: join path with '.' (e.g., 'entity_match.overall').
+    - Numeric scalars -> key: float
+    - Lists -> optionally add '<key>__len'; if all numbers, also mean/min/max
+    - Dicts -> recurse with dotted prefix
+    - Booleans -> only included if key (dotted path) matches allowlist/globs; stored as 0.0/1.0 with suffix '_bool'
     """
     out: Dict[str, float] = {}
+
+    # Pre-compile simple matchers for boolean allowlist
+    allowlist = set(include_boolean_allowlist or [])
+    has_globs = any(('*' in p or '?' in p or '[' in p) for p in allowlist)
+
+    def _bool_allowed(path: str) -> bool:
+        if not allowlist:
+            return False
+        if path in allowlist:
+            return True
+        if has_globs:
+            return any(fnmatch.fnmatch(path, pat) for pat in allowlist)
+        return False
+
     for k, v in rep.items():
         key = f"{prefix}{k}" if not prefix else f"{prefix}.{k}"
+
+        # 1) Numbers
         if _is_number(v):
             out[key] = float(v)
-        elif isinstance(v, dict):
-            out.update(_flatten_report(v, prefix=key, include_list_lengths=include_list_lengths))
-        elif isinstance(v, list):
+            continue
+
+        # 2) Booleans (optional)
+        if isinstance(v, bool):
+            if _bool_allowed(key):
+                out[f"{key}_bool"] = 1.0 if v else 0.0
+            continue
+
+        # 3) Dicts
+        if isinstance(v, dict):
+            out.update(
+                _flatten_report(
+                    v,
+                    prefix=key,
+                    include_list_lengths=include_list_lengths,
+                    include_numeric_list_stats=include_numeric_list_stats,
+                    include_boolean_allowlist=include_boolean_allowlist,
+                )
+            )
+            continue
+
+        # 4) Lists
+        if isinstance(v, list):
             if include_list_lengths:
                 out[f"{key}__len"] = float(len(v))
-            # ignore list contents for now (keeps it dependency-free & simple)
-        # ignore strings/None/etc
-    return out
 
+            if include_numeric_list_stats and v and all(_is_number(x) for x in v):
+                arr = np.array(v, dtype=float)
+                # guard against nan/inf after cast
+                if arr.size and np.isfinite(arr).all():
+                    out[f"{key}__mean"] = float(arr.mean())
+                    out[f"{key}__min"]  = float(arr.min())
+                    out[f"{key}__max"]  = float(arr.max())
+            # (skip lists of dicts/strings; length is enough)
+            continue
+
+        # 5) Everything else (strings/None/etc.) -> ignore
+
+    return out
 
 # --------------------------------------------------------
 # 3) Feature selection configuration (include/exclude)
@@ -214,8 +272,14 @@ def extract_features_all(
         use_embed_alignment=False,       # no embeddings by default (portable)
         metrics_config=metrics_config,   # pass caller’s toggles for quick-wins etc.
     )
-
-    flat = _flatten_report(rep, prefix="")
+    
+    flat = _flatten_report(
+    rep,
+    prefix="",
+    include_list_lengths=True,
+    include_numeric_list_stats=True,
+    include_boolean_allowlist=("inference_likely",)
+    )
     if feature_config:
         flat = feature_config.filter(flat)
 

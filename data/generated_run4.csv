@@ -1,0 +1,52 @@
+q,a,c_joined,y,reason
+What is the expected market expansion percentage for 2024?,The market is expected to expand by 15%.,"Market Overview: Analysts predict a 15% expansion in the market for 2024 due to increased demand and innovations.
+---
+Company Report: The company has aligned its strategies to tap into this expected growth.",1,The answer is directly supported by the context.
+What was the total number of active users reported last quarter?,The total active users were 2 million.,"Quarterly Report: The company reported 2 million active users, which is a 20% increase from the previous quarter.
+---
+User Engagement: Engagement metrics show users are spending more time on the platform.",1,The figure is explicitly mentioned in the report.
+What is the company's plan for reducing carbon emissions?,They aim for a 30% reduction by 2030.,"Sustainability Report: The company has set a target to reduce carbon emissions by 30% by 2030 as part of their sustainability goals.
+---
+Environmental Strategy: Investments in renewable energy sources are part of the plan.",1,The target is clearly stated in the sustainability report.
+When is the next board meeting scheduled?,"The next board meeting is on March 15, 2024.","Meeting Schedule: The next board meeting is confirmed for March 15, 2024, at 2 PM.
+---
+Agenda: Key topics will include budget approvals and strategic initiatives.",1,The date is specified in the meeting schedule.
+What is the projected decrease in operating expenses for next year?,Operating expenses are projected to decrease by 5%.,"Financial Outlook: The company anticipates a 5% decrease in operating expenses due to improved efficiency measures.
+---
+Budget Review: Cost-cutting initiatives are underway to support this projection.",1,The decrease is detailed in the financial outlook.
+What is the weight limit for the new product?,The weight limit is 200 kg.,"Product Specification: The new device has a weight limit of 200 kg, suitable for heavy-duty use.
+---
+User Manual: Safety guidelines recommend adhering to the specified weight limit.",1,The weight limit is clearly stated in the specifications.
+When was the product launch event held?,"The product launch event was on September 20, 2023.","Event Summary: The product was officially launched on September 20, 2023, with a live demonstration.
+---
+Press Release: The launch attracted significant media attention and customer interest.",1,The date of the event is explicitly mentioned.
+What is the new pricing model for the service?,The new pricing model starts at $15 per month.,"Pricing Update: The service has introduced a new model starting at $15 per month, aimed at attracting more users.
+---
+Comparison Chart: Previous plans were priced higher and included fewer features.",1,The pricing detail is provided in the context.
+What are the new features included in the latest software update?,The update includes a dark mode and enhanced security.,"Update Notes: The latest software update introduces a dark mode and improved security features, addressing user feedback.
+---
+Release Highlights: Users can now switch to dark mode in the settings.",1,Both features are outlined in the update notes.
+What is the standard warranty period for the new product?,The warranty period is two years.,"Warranty Policy: The new product comes with a standard two-year warranty covering manufacturing defects.
+---
+Customer Service: Extended warranty options are also available for purchase.",1,The warranty period is explicitly stated in the policy.
+What was the reported profit margin for Q2?,Profit margin was reported at 30%.,"Earnings Report: The Q2 profit margin was reported at 30%, reflecting strong sales performance.
+---
+Analyst Review: This is an improvement from 25% in the previous quarter.",0,"The report states a profit margin of 25%, not 30%."
+What is the company's stance on remote work?,Remote work is not allowed in the company.,"Company Policy: The company encourages a hybrid work model, allowing employees to work remotely two days a week.
+---
+HR Guidelines: Full remote work is not an option for most roles.",0,The answer contradicts the stated hybrid work model.
+What is the sales target for next quarter?,The sales target is $10 million.,"Sales Forecast: Management has set a sales target of $12 million for the next quarter, up from $10 million last year.
+---
+Strategic Goals: This aligns with the company's growth initiatives.",0,"The target is actually $12 million, not $10 million."
+How many new hires are expected this year?,The company plans to hire 500 new employees.,"Hiring Plan: The company expects to add 300 new employees this year, focusing on key growth areas.
+---
+HR Projections: This is a slight decrease from 400 hires last year.",0,"The hiring plan indicates 300, not 500."
+What is the deadline for project submissions?,"The deadline is December 31, 2023.","Project Guidelines: All submissions must be completed by December 1, 2023, to allow for review.
+---
+Final reminders will be sent out in late November.",0,"The deadline is actually December 1, not December 31."
+What is the expected return on investment (ROI) for the new initiative?,The expected ROI is around 20%.,"Financial Analysis: The new initiative is projected to deliver an ROI of 15% within the first year.
+---
+Market Research: Long-term projections suggest a potential increase to 20%.",0,"The expected ROI is 15%, not 20%."
+What is the target customer demographic for the new marketing campaign?,The campaign targets millennials.,"Marketing Strategy: The new campaign is aimed primarily at Gen Z, with specific messaging tailored to their interests.
+---
+Research Findings: Millennials are less emphasized in this initiative.",0,"The target demographic is Gen Z, not millennials."

@@ -1,0 +1,192 @@
+[
+  {
+    "q": "What was the total revenue for Q1 2023?",
+    "a": "$4.8 billion.",
+    "c": [
+      "Q1 Financial Report: The total revenue for Q1 2023 was recorded at $4.8 billion, showing a significant increase from the previous quarter.",
+      "Quarterly Earnings Call: Management discussed growth drivers that contributed to the $4.8 billion revenue figure."
+    ],
+    "y": 1,
+    "reason": "Accurate revenue figure stated in the context."
+  },
+  {
+    "q": "What is the maximum loan amount available?",
+    "a": "$250,000.",
+    "c": [
+      "Loan Policy Document: The maximum loan amount available is $250,000 for eligible applicants.",
+      "FAQs on Loans: Applicants can apply for loans up to $250,000, depending on their creditworthiness."
+    ],
+    "y": 1,
+    "reason": "The loan limit is explicitly mentioned."
+  },
+  {
+    "q": "When does the next fiscal year start?",
+    "a": "The next fiscal year starts on April 1, 2024.",
+    "c": [
+      "Fiscal Year Overview: The upcoming fiscal year is set to begin on April 1, 2024, following the standard company schedule.",
+      "Annual Planning Document: The fiscal year transitions every April 1."
+    ],
+    "y": 1,
+    "reason": "The date is clearly defined in the context."
+  },
+  {
+    "q": "What is the target operating margin for next year?",
+    "a": "Target operating margin is 20%.",
+    "c": [
+      "Investor Guidance: The company aims for a target operating margin of 20% for the next fiscal year based on current strategies.",
+      "Financial Projections: The operating margin goal is confirmed in the management's outlook for next year."
+    ],
+    "y": 1,
+    "reason": "The operating margin target is stated accurately."
+  },
+  {
+    "q": "What is the effective date of the new policy?",
+    "a": "The new policy takes effect on June 15, 2024.",
+    "c": [
+      "Policy Update Memo: The new employee policy is effective starting June 15, 2024, as communicated in the recent memo.",
+      "HR Announcement: All staff are advised to be compliant by the effective date of June 15, 2024."
+    ],
+    "y": 1,
+    "reason": "The effective date is explicitly mentioned."
+  },
+  {
+    "q": "What is the average response time for customer support tickets?",
+    "a": "Average response time is 48 hours.",
+    "c": [
+      "Support Performance Report: The average response time for customer support tickets has been recorded at 48 hours.",
+      "Internal Review: Metrics show that the team aims to resolve issues within an average of 48 hours."
+    ],
+    "y": 1,
+    "reason": "The response time is clearly stated."
+  },
+  {
+    "q": "What are the criteria for eligibility for the scholarship?",
+    "a": "Must be a full-time student with a GPA of 3.5 or higher.",
+    "c": [
+      "Scholarship Guidelines: Eligibility criteria include being a full-time student and maintaining a GPA of at least 3.5.",
+      "Application Form: Applicants must meet the GPA requirement and be enrolled full-time."
+    ],
+    "y": 1,
+    "reason": "Eligibility criteria are accurately represented."
+  },
+  {
+    "q": "What was the total number of employees as of Q2 2023?",
+    "a": "The total number of employees was 1,200.",
+    "c": [
+      "Q2 Workforce Report: As of the end of Q2 2023, the company employed a total of 1,200 individuals.",
+      "HR Statistics: The employee count is consistent with the reported figures in the workforce analysis."
+    ],
+    "y": 1,
+    "reason": "Employee count matches the context."
+  },
+  {
+    "q": "What is the expected delivery time for orders?",
+    "a": "Expected delivery time is 5 to 7 business days.",
+    "c": [
+      "Shipping Policy: Orders are typically delivered within 5 to 7 business days after processing.",
+      "Customer Service FAQ: Standard delivery time for all shipments is stated as 5 to 7 business days."
+    ],
+    "y": 1,
+    "reason": "Delivery time is clearly specified in the context."
+  },
+  {
+    "q": "What is the penalty for late submission of reports?",
+    "a": "A penalty of $100 per day.",
+    "c": [
+      "Reporting Guidelines: A late submission of reports incurs a penalty of $100 for each day the report is overdue.",
+      "Compliance Rules: Timeliness is critical; penalties are enforced for late reports according to policy."
+    ],
+    "y": 1,
+    "reason": "The penalty amount is explicitly mentioned."
+  },
+  {
+    "q": "What was the total profit margin for last year?",
+    "a": "The total profit margin was 30%.",
+    "c": [
+      "Annual Financial Overview: The profit margin for the previous year was calculated at 30%, reflecting strong performance.",
+      "Earnings Report: Highlights include a profit margin of 30% for the last fiscal year."
+    ],
+    "y": 1,
+    "reason": "Profit margin figure matches the context."
+  },
+  {
+    "q": "What is the warranty period for the new product?",
+    "a": "The warranty period is 12 months.",
+    "c": [
+      "Product Warranty Information: All new products come with a warranty period of 12 months from the date of purchase.",
+      "Sales Brochure: Warranty terms specify a coverage period of 12 months."
+    ],
+    "y": 1,
+    "reason": "Warranty duration is clearly stated."
+  },
+  {
+    "q": "What was the average salary increase for employees this year?",
+    "a": "Average salary increase was 5%.",
+    "c": [
+      "HR Salary Review: The average salary increase across the company this year was reported as 5%.",
+      "Employee Compensation Report: Highlights indicate a 5% increase in average salaries."
+    ],
+    "y": 1,
+    "reason": "Salary increase percentage is accurately referenced."
+  },
+  {
+    "q": "What is the minimum requirement for the job position?",
+    "a": "A bachelor's degree is required.",
+    "c": [
+      "Job Posting: Minimum qualifications for the position include a bachelor's degree in a relevant field.",
+      "HR Recruitment Guidelines: A bachelor's degree is mandatory for applicants."
+    ],
+    "y": 1,
+    "reason": "Job requirement is clearly articulated."
+  },
+  {
+    "q": "What is the budget for the upcoming project?",
+    "a": "$500,000.",
+    "c": [
+      "Project Proposal Document: The budget allocated for the upcoming project is set at $500,000.",
+      "Financial Planning Overview: The project's financial outline includes a budget of $500,000."
+    ],
+    "y": 1,
+    "reason": "Budget amount is explicitly stated."
+  },
+  {
+    "q": "What is the limit for annual leave days?",
+    "a": "The limit is 20 days.",
+    "c": [
+      "Leave Policy Document: Employees are entitled to a maximum of 20 annual leave days each year.",
+      "HR Guidelines: The annual leave policy specifies a limit of 20 days for all full-time staff."
+    ],
+    "y": 1,
+    "reason": "Leave limit is clearly defined."
+  },
+  {
+    "q": "What is the maximum fine for policy violations?",
+    "a": "The maximum fine is $1,000.",
+    "c": [
+      "Compliance Policy: The maximum fine for any policy violation is set at $1,000.",
+      "Regulatory Document: Penalties for infractions include fines up to $1,000."
+    ],
+    "y": 1,
+    "reason": "Fine amount is accurately stated."
+  },
+  {
+    "q": "What is the current annual interest rate offered?",
+    "a": "The current annual interest rate is 6%.",
+    "c": [
+      "Interest Rate Announcement: The current annual interest rate for savings accounts is 6%.",
+      "Banking Policy Update: Effective immediately, the annual interest rate is set to 6%."
+    ],
+    "y": 1,
+    "reason": "Interest rate is explicitly mentioned."
+  },
+  {
+    "q": "What is the average lifespan of the product?",
+    "a": "The average lifespan is 2 years.",
+    "c": [
+      "Product Specifications: The average lifespan of the product is estimated to be 2 years based on testing.",
+      "User Manual: Expected lifespan details indicate an average of 2 years under normal usage."
+    ],
+    "y": 1,
+    "reason": "Lifespan information is clearly defined."
+  }
+]

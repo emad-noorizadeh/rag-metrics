@@ -33,6 +33,19 @@ from typing import List, Dict, Any, Tuple, Optional
 from collections import Counter
 from math import log, sqrt
 
+# --- Optional spaCy (POS) ---
+_SPACY_NLP = None
+def _maybe_load_spacy(model: str = "en_core_web_sm"):
+    global _SPACY_NLP
+    if _SPACY_NLP is not None:
+        return _SPACY_NLP
+    try:
+        import spacy
+        _SPACY_NLP = spacy.load(model, disable=["ner"])  # fast POS/lemmatizer only
+    except Exception:
+        _SPACY_NLP = None
+    return _SPACY_NLP
+
 # NEW imports from typed extractor
 from extractor import (
     ExtractorConfig, DEFAULT_CONFIG,
@@ -100,6 +113,37 @@ def _normalized_token_spans(text: str):
             continue
         yield norm, s, e, tok
 
+# Content POS for “semantic” terms (tune to taste)
+_CONTENT_POS = {"NOUN", "PROPN", "NUM", "VERB", "ADJ"}
+
+def _spacy_pos_terms(text: str, nlp, stopwords=_STOPWORDS) -> List[str]:
+    """Return normalized lemmas for content POS only."""
+    if not text:
+        return []
+    doc = nlp(text)
+    out = []
+    for t in doc:
+        if t.pos_ in _CONTENT_POS:
+            lem = (t.lemma_ or t.text).lower().strip()
+            if lem and lem.isascii() and lem not in stopwords:
+                # normalize simple digits the same way we do elsewhere
+                if re.fullmatch(r"[-+]?\d[\d,]*\.?\d*", lem):
+                    lem = re.sub(r"[,\s]", "", lem)
+                out.append(lem)
+    return out
+
+def _head_nouns(text: str, nlp) -> List[str]:
+    """Extract head nouns of noun chunks for stronger concept alignment."""
+    if not text:
+        return []
+    doc = nlp(text)
+    heads = []
+    for nc in doc.noun_chunks:
+        h = nc.root.lemma_.lower() if nc.root.lemma_ else nc.root.text.lower()
+        if h and h.isascii():
+            heads.append(h)
+    return heads
+
 def _informative_terms(tokens):
     return [t for t in tokens if t and t not in _STOPWORDS and not t.isdigit() and t not in {"$", "%"}]
 
@@ -134,6 +178,67 @@ def _weighted_precision(answer_terms: List[str], context_terms: List[str], idf):
         if t in c:
             w_inter += idf.get(t, 1.0) * min(cnt, c[t])
     return (w_inter / w_answer) if w_answer > 0 else 0.0
+
+# -------------------------
+# POS-aware unsupported/supported calculations
+# -------------------------
+
+def _pos_supported_stats(answer: str, contexts: List[str], idf: Dict[str, float], nlp) -> Dict[str, float]:
+    """
+    Compute POS-aware coverage:
+      - content_precision_token: IDF-weighted precision using only content-POS terms
+      - content_unsupported_mass: 1 - precision over content terms
+      - content_term_support_rate: fraction of unique content terms supported
+      - head_noun_support_rate: fraction of answer head nouns found in context
+    Returns zeros if spaCy not available or texts missing.
+    """
+    if nlp is None or not answer:
+        return {
+            "content_precision_token": None,
+            "content_unsupported_mass": None,
+            "content_term_support_rate": None,
+            "head_noun_support_rate": None,
+        }
+
+    a_pos_terms = _spacy_pos_terms(answer, nlp)
+    if not contexts:
+        # no context—define “none supported”
+        uniq = len(set(a_pos_terms)) or 1
+        return {
+            "content_precision_token": 0.0 if a_pos_terms else None,
+            "content_unsupported_mass": 1.0 if a_pos_terms else None,
+            "content_term_support_rate": 0.0 if a_pos_terms else None,
+            "head_noun_support_rate": 0.0 if _head_nouns(answer, nlp) else None,
+        }
+
+    ctx_pos_terms = []
+    for s in contexts:
+        ctx_pos_terms.extend(_spacy_pos_terms(s or "", nlp))
+
+    # IDF precision on content terms
+    c_prec = _weighted_precision(a_pos_terms, ctx_pos_terms, idf) if a_pos_terms else None
+    c_unsup_mass = (1.0 - c_prec) if (c_prec is not None) else None
+
+    # Unique-term support rate
+    a_set = set(a_pos_terms)
+    c_set = set(ctx_pos_terms)
+    support_rate = (len(a_set & c_set) / len(a_set)) if a_set else None
+
+    # Head noun support rate (unique heads overlapped)
+    a_heads = set(_head_nouns(answer, nlp))
+    ctx_heads = set()
+    for s in contexts:
+        ctx_heads.update(_head_nouns(s or "", nlp))
+    head_rate = (len(a_heads & ctx_heads) / len(a_heads)) if a_heads else None
+
+    # Round lightly for report neatness
+    def r(x): return None if x is None else round(float(x), 4)
+    return {
+        "content_precision_token": r(c_prec),
+        "content_unsupported_mass": r(c_unsup_mass),
+        "content_term_support_rate": r(support_rate),
+        "head_noun_support_rate": r(head_rate),
+    }
 
 # -------------------------
 # Numeric coverage (typed)
@@ -475,6 +580,55 @@ def _compute_unsupported_extras(
         "unsupported_entity_mass": None if unsupported_entity_mass is None else round(float(unsupported_entity_mass), 4),
     }
 
+
+# -------------------------
+# Inference detector (paraphrase vs inference)
+# -------------------------
+def _inference_signal(rep: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Heuristic detector for 'likely inferred (not paraphrased)' answers:
+      - low lexical overlap, but
+      - high numeric/entity coverage, and
+      - moderate Q↔A alignment.
+    Returns a score in [0,1] plus a boolean flag.
+    """
+    prec = rep.get("precision_token")
+    cprec = rep.get("content_precision_token")
+    num = rep.get("numeric_match")
+    ent_overall = (rep.get("entity_match", {}) or {}).get("overall")
+    qa_tfidf = (rep.get("qr_alignment", {}) or {}).get("cosine_tfidf")
+
+    # defaults
+    prec = 0.0 if prec is None else float(prec)
+    cprec = cprec if (cprec is not None) else prec
+    num = 0.0 if num is None else float(num)
+    ent_overall = 0.0 if ent_overall is None else float(ent_overall)
+    qa_tfidf = 0.0 if qa_tfidf is None else float(qa_tfidf)
+
+    # Conditions (tune thresholds as you like)
+    low_lex = (prec < 0.45) or (cprec < 0.45)
+    strong_typed = max(num, ent_overall) >= 0.9
+    sem_ok = qa_tfidf >= 0.35  # embeddings could replace this if enabled
+
+    # Score: how strongly it looks inferred
+    score = 0.0
+    if low_lex and strong_typed and sem_ok:
+        # weight by how low lexical is and how high typed grounding is
+        lex_gap = 1.0 - max(prec, (cprec if cprec is not None else 0.0))
+        typed = max(num, ent_overall)
+        score = min(1.0, 0.5 * lex_gap + 0.5 * (typed - 0.9) * 10.0)  # cheap squeeze
+
+    return {
+        "inference_likely": bool(score >= 0.5),
+        "inference_score": round(score, 4),
+        "inference_explanation": (
+            "Low lexical grounding but strong numeric/entity alignment and decent Q↔A similarity."
+            if score >= 0.5 else
+            "No strong inference signal detected."
+        )
+    }
+
+
 # -------------------------
 # Main advanced function
 # -------------------------
@@ -709,6 +863,36 @@ def context_utilization_report_with_entities(
     if _is_enabled(metrics_config, "p90_sentence_precision"):
         quickwin["p90_sentence_precision"] = round(float(p90_sentence_precision), 4)
 
+    # ---- POS-aware stats (optional spaCy)
+    pos_stats = {}
+    if (metrics_config or {}).get("enable_pos_metrics", True):
+        nlp = _maybe_load_spacy("en_core_web_sm")
+        pos_stats = _pos_supported_stats(answer, retrieved_contexts, idf, nlp)
+    else:
+        pos_stats = {
+            "content_precision_token": None,
+            "content_unsupported_mass": None,
+            "content_term_support_rate": None,
+            "head_noun_support_rate": None,
+        }
+
+    # ---- Inference signal
+    # Merge pos_stats into a temp dict so _inference_signal can see content_precision_token
+    tmp_rep_for_infer = {
+        **{
+            "precision_token": precision_token,
+            "numeric_match": numeric_match,
+            "entity_match": entity_match,
+            "qr_alignment": {"cosine_tfidf": qr_cosine},
+        },
+        **pos_stats,
+    }
+    infer = {}
+    if (metrics_config or {}).get("enable_inference_signal", True):
+        infer = _inference_signal(tmp_rep_for_infer)
+    else:
+        infer = {"inference_likely": None, "inference_score": None, "inference_explanation": None}
+
     # ---- Summary
     pct = round(precision_token * 100, 1)
     rec = round(recall_context * 100, 1)
@@ -745,6 +929,15 @@ def context_utilization_report_with_entities(
         "unsupported_terms": unsupported,
         "unsupported_terms_per_sentence": unsupported_ps,
         "unsupported_numbers": unsupported_nums,
+        # POS-aware additions
+        "content_precision_token": pos_stats.get("content_precision_token"),
+        "content_unsupported_mass": pos_stats.get("content_unsupported_mass"),
+        "content_term_support_rate": pos_stats.get("content_term_support_rate"),
+        "head_noun_support_rate": pos_stats.get("head_noun_support_rate"),
+        # Inference detector
+        "inference_likely": infer.get("inference_likely"),
+        "inference_score": infer.get("inference_score"),
+        "inference_explanation": infer.get("inference_explanation"),
         "summary": summary,
         **quickwin,
         **extras,

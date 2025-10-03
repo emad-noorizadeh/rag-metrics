@@ -1,0 +1,172 @@
+[
+  {
+    "q": "What is the expected market expansion percentage for 2024?",
+    "a": "The market is expected to expand by 15%.",
+    "c": [
+      "Market Overview: Analysts predict a 15% expansion in the market for 2024 due to increased demand and innovations.",
+      "Company Report: The company has aligned its strategies to tap into this expected growth."
+    ],
+    "y": 1,
+    "reason": "The answer is directly supported by the context."
+  },
+  {
+    "q": "What was the total number of active users reported last quarter?",
+    "a": "The total active users were 2 million.",
+    "c": [
+      "Quarterly Report: The company reported 2 million active users, which is a 20% increase from the previous quarter.",
+      "User Engagement: Engagement metrics show users are spending more time on the platform."
+    ],
+    "y": 1,
+    "reason": "The figure is explicitly mentioned in the report."
+  },
+  {
+    "q": "What is the company's plan for reducing carbon emissions?",
+    "a": "They aim for a 30% reduction by 2030.",
+    "c": [
+      "Sustainability Report: The company has set a target to reduce carbon emissions by 30% by 2030 as part of their sustainability goals.",
+      "Environmental Strategy: Investments in renewable energy sources are part of the plan."
+    ],
+    "y": 1,
+    "reason": "The target is clearly stated in the sustainability report."
+  },
+  {
+    "q": "When is the next board meeting scheduled?",
+    "a": "The next board meeting is on March 15, 2024.",
+    "c": [
+      "Meeting Schedule: The next board meeting is confirmed for March 15, 2024, at 2 PM.",
+      "Agenda: Key topics will include budget approvals and strategic initiatives."
+    ],
+    "y": 1,
+    "reason": "The date is specified in the meeting schedule."
+  },
+  {
+    "q": "What is the projected decrease in operating expenses for next year?",
+    "a": "Operating expenses are projected to decrease by 5%.",
+    "c": [
+      "Financial Outlook: The company anticipates a 5% decrease in operating expenses due to improved efficiency measures.",
+      "Budget Review: Cost-cutting initiatives are underway to support this projection."
+    ],
+    "y": 1,
+    "reason": "The decrease is detailed in the financial outlook."
+  },
+  {
+    "q": "What is the weight limit for the new product?",
+    "a": "The weight limit is 200 kg.",
+    "c": [
+      "Product Specification: The new device has a weight limit of 200 kg, suitable for heavy-duty use.",
+      "User Manual: Safety guidelines recommend adhering to the specified weight limit."
+    ],
+    "y": 1,
+    "reason": "The weight limit is clearly stated in the specifications."
+  },
+  {
+    "q": "When was the product launch event held?",
+    "a": "The product launch event was on September 20, 2023.",
+    "c": [
+      "Event Summary: The product was officially launched on September 20, 2023, with a live demonstration.",
+      "Press Release: The launch attracted significant media attention and customer interest."
+    ],
+    "y": 1,
+    "reason": "The date of the event is explicitly mentioned."
+  },
+  {
+    "q": "What is the new pricing model for the service?",
+    "a": "The new pricing model starts at $15 per month.",
+    "c": [
+      "Pricing Update: The service has introduced a new model starting at $15 per month, aimed at attracting more users.",
+      "Comparison Chart: Previous plans were priced higher and included fewer features."
+    ],
+    "y": 1,
+    "reason": "The pricing detail is provided in the context."
+  },
+  {
+    "q": "What are the new features included in the latest software update?",
+    "a": "The update includes a dark mode and enhanced security.",
+    "c": [
+      "Update Notes: The latest software update introduces a dark mode and improved security features, addressing user feedback.",
+      "Release Highlights: Users can now switch to dark mode in the settings."
+    ],
+    "y": 1,
+    "reason": "Both features are outlined in the update notes."
+  },
+  {
+    "q": "What is the standard warranty period for the new product?",
+    "a": "The warranty period is two years.",
+    "c": [
+      "Warranty Policy: The new product comes with a standard two-year warranty covering manufacturing defects.",
+      "Customer Service: Extended warranty options are also available for purchase."
+    ],
+    "y": 1,
+    "reason": "The warranty period is explicitly stated in the policy."
+  },
+  {
+    "q": "What was the reported profit margin for Q2?",
+    "a": "Profit margin was reported at 30%.",
+    "c": [
+      "Earnings Report: The Q2 profit margin was reported at 30%, reflecting strong sales performance.",
+      "Analyst Review: This is an improvement from 25% in the previous quarter."
+    ],
+    "y": 0,
+    "reason": "The report states a profit margin of 25%, not 30%."
+  },
+  {
+    "q": "What is the company's stance on remote work?",
+    "a": "Remote work is not allowed in the company.",
+    "c": [
+      "Company Policy: The company encourages a hybrid work model, allowing employees to work remotely two days a week.",
+      "HR Guidelines: Full remote work is not an option for most roles."
+    ],
+    "y": 0,
+    "reason": "The answer contradicts the stated hybrid work model."
+  },
+  {
+    "q": "What is the sales target for next quarter?",
+    "a": "The sales target is $10 million.",
+    "c": [
+      "Sales Forecast: Management has set a sales target of $12 million for the next quarter, up from $10 million last year.",
+      "Strategic Goals: This aligns with the company's growth initiatives."
+    ],
+    "y": 0,
+    "reason": "The target is actually $12 million, not $10 million."
+  },
+  {
+    "q": "How many new hires are expected this year?",
+    "a": "The company plans to hire 500 new employees.",
+    "c": [
+      "Hiring Plan: The company expects to add 300 new employees this year, focusing on key growth areas.",
+      "HR Projections: This is a slight decrease from 400 hires last year."
+    ],
+    "y": 0,
+    "reason": "The hiring plan indicates 300, not 500."
+  },
+  {
+    "q": "What is the deadline for project submissions?",
+    "a": "The deadline is December 31, 2023.",
+    "c": [
+      "Project Guidelines: All submissions must be completed by December 1, 2023, to allow for review.",
+      "Final reminders will be sent out in late November."
+    ],
+    "y": 0,
+    "reason": "The deadline is actually December 1, not December 31."
+  },
+  {
+    "q": "What is the expected return on investment (ROI) for the new initiative?",
+    "a": "The expected ROI is around 20%.",
+    "c": [
+      "Financial Analysis: The new initiative is projected to deliver an ROI of 15% within the first year.",
+      "Market Research: Long-term projections suggest a potential increase to 20%."
+    ],
+    "y": 0,
+    "reason": "The expected ROI is 15%, not 20%."
+  },
+  {
+    "q": "What is the target customer demographic for the new marketing campaign?",
+    "a": "The campaign targets millennials.",
+    "c": [
+      "Marketing Strategy: The new campaign is aimed primarily at Gen Z, with specific messaging tailored to their interests.",
+      "Research Findings: Millennials are less emphasized in this initiative."
+    ],
+    "y": 0,
+    "reason": "The target demographic is Gen Z, not millennials."
+  }
+]

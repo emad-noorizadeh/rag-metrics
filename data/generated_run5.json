@@ -1,0 +1,52 @@
+[
+  {
+    "q": "What is the expected launch date for the new product?",
+    "a": "March 15, 2024.",
+    "c": [
+      "Announcement: The new product is set to launch on March 15, 2024, following extensive testing. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S.",
+      "Timeline: Pre-orders will begin a month prior, on February 15, 2024. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S."
+    ],
+    "y": 1,
+    "reason": "The answer matches the date provided in the context."
+  },
+  {
+    "q": "What is the company's target net profit margin for the next fiscal year?",
+    "a": "15%.",
+    "c": [
+      "Financial Outlook: The company aims for a net profit margin of 10% for the upcoming fiscal year due to increased operational efficiency. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S.",
+      "Analysts predict margins may improve slightly, but not exceed 12%. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S."
+    ],
+    "y": 0,
+    "reason": "The answer of 15% contradicts the stated target of 10%."
+  },
+  {
+    "q": "What is the average time to resolve customer support tickets?",
+    "a": "48 hours.",
+    "c": [
+      "Support Metrics: The average resolution time for customer support tickets is around 48 hours, with priority tickets handled within 24 hours. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S.",
+      "Recent improvements have reduced resolution times by 20%. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S."
+    ],
+    "y": 1,
+    "reason": "The answer is consistent with the information given in the context."
+  },
+  {
+    "q": "What is the maximum allowable weight for the shipment?",
+    "a": "100 kg.",
+    "c": [
+      "Shipping Guidelines: Each shipment must not exceed 50 kg unless special permissions are obtained. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S.",
+      "Note: Packages over 50 kg require additional handling fees. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S."
+    ],
+    "y": 0,
+    "reason": "The answer of 100 kg contradicts the stated maximum of 50 kg."
+  },
+  {
+    "q": "What is the new software version number?",
+    "a": "Version 2.1.",
+    "c": [
+      "Release Notes: The latest software update is version 2.0, which includes several bug fixes and performance improvements. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S.",
+      "Future updates are planned, but version 2.1 is not yet available. Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and transfers from non-Bank of America ATMs in the U.S."
+    ],
+    "y": 0,
+    "reason": "The answer states version 2.1, which does not match the current version of 2.0."
+  }
+]
