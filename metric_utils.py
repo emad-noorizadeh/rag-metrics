@@ -247,16 +247,21 @@ def _pos_supported_stats(answer: str, contexts: List[str], idf: Dict[str, float]
 def _numeric_match_only(answer: str, contexts: List[str], config: ExtractorConfig = DEFAULT_CONFIG) -> float:
     """
     Fraction of numeric facts (MONEY/NUMBER/PERCENT) in answer present in any context.
-    Uses typed extractor (no spaCy/quantulum3).
+    Uses typed extractor (no spaCy/quantulum3) with overlap suppression so that
+    higher-priority entities (MONEY > DATE > QUANTITY > PHONE > PERCENT > NUMBER)
+    suppress lower-priority overlaps before matching.
     """
     target_types = {"MONEY", "NUMBER", "PERCENT"}
-    ans = [e for e in extract_entities(answer or "", config=config) if e.type in target_types]
+
+    # Extract with suppression to avoid NUMBERs that are part of DATE/MONEY, etc.
+    ans_all = _extract_with_suppression(answer or "", config)
+    ans = [e for e in ans_all if e.type in target_types]
     if not ans:
         return 1.0
 
     ctx_all: List[Entity] = []
     for s in contexts or []:
-        ctx_all.extend(extract_entities(s or "", config=config))
+        ctx_all.extend(_extract_with_suppression(s or "", config))
     ctx_nums = [e for e in ctx_all if e.type in target_types]
 
     used = [False] * len(ctx_nums)
@@ -278,10 +283,15 @@ def _unsupported_numbers(answer: str, contexts: List[str], config: ExtractorConf
     Return the numeric entities (MONEY/NUMBER/PERCENT) in answer that are NOT present in contexts.
     """
     target_types = {"MONEY", "NUMBER", "PERCENT"}
-    ans = [e for e in extract_entities(answer or "", config=config) if e.type in target_types]
-    ctx = []
+
+    # Extract with suppression (avoid NUMBER inside DATE/MONEY etc.)
+    ans_all = _extract_with_suppression(answer or "", config)
+    ctx_all: List[Entity] = []
     for s in contexts or []:
-        ctx.extend([e for e in extract_entities(s or "", config=config) if e.type in target_types])
+        ctx_all.extend(_extract_with_suppression(s or "", config))
+
+    ans = [e for e in ans_all if e.type in target_types]
+    ctx = [e for e in ctx_all if e.type in target_types]
 
     used = [False] * len(ctx)
     out = []
@@ -365,15 +375,66 @@ def _pick_best_context_by_bm25(ans_terms: List[str], contexts_terms: List[List[s
 # Typed entity alignment
 # -------------------------
 
+def _suppress_overlaps_by_priority(ents: List[Entity]) -> List[Entity]:
+    """
+    Suppress lower-priority entities that overlap higher-priority ones.
+
+    Priority (highest → lowest):
+      1) MONEY
+      2) DATE
+      3) QUANTITY
+      4) PHONE
+      5) PERCENT
+      6) NUMBER
+
+    If two entities overlap, keep the higher-priority one and drop the lower.
+    Equal-priority overlaps are both kept.
+    """
+    if not ents:
+        return ents
+
+    prio_order = ["MONEY", "DATE", "QUANTITY", "PHONE", "PERCENT", "NUMBER"]
+    prio = {t: i for i, t in enumerate(prio_order)}
+
+    # Sort by priority (high first), then by longer span first, then by start
+    def keyfn(e: Entity):
+        length = (e.span[1] - e.span[0]) if e.span else 0
+        return (prio.get(e.type, len(prio_order)), -length, e.span[0])
+
+    sorted_ents = sorted(ents, key=keyfn)
+    kept: List[Tuple[int, Tuple[int, int], Entity]] = []
+
+    for e in sorted_ents:
+        p_cur = prio.get(e.type, len(prio_order))
+        s, t = e.span
+        overlap_with_higher = False
+        for p_k, (ks, kt), _ in kept:
+            if p_k < p_cur:  # only suppress if an already-kept entity has higher priority
+                if not (t <= ks or kt <= s):  # spans overlap
+                    overlap_with_higher = True
+                    break
+        if not overlap_with_higher:
+            kept.append((p_cur, (s, t), e))
+
+    # Return kept entities in original text order for downstream stability
+    return [e for _, (_, _), e in sorted(kept, key=lambda x: (x[1][0], x[1][1]))]
+
+
+def _extract_with_suppression(text: str, config: ExtractorConfig) -> List[Entity]:
+    """Extract entities then suppress lower-priority overlaps."""
+    ents = extract_entities(text or "", config=config)
+    return _suppress_overlaps_by_priority(ents)
+
+
 def _entity_alignment(answer: str, contexts: List[str], config: ExtractorConfig = DEFAULT_CONFIG) -> Dict[str, Any]:
     """
     Typed entity alignment using extractor.py (regex money/number/percent/date/quantity/phone).
     Returns match (overall/by_type/unsupported) and supported_entities with spans.
     """
-    ans_ents: List[Entity] = extract_entities(answer or "", config=config)
+    ans_ents: List[Entity] = _extract_with_suppression(answer or "", config)
     ctx_ents: List[Entity] = []
     for s in contexts or []:
-        ctx_ents.extend(extract_entities(s or "", config=config))
+        ctx_ents.extend(_extract_with_suppression(s or "", config))
 
     if not ans_ents:
         return {
@@ -411,12 +472,25 @@ def _entity_alignment(answer: str, contexts: List[str], config: ExtractorConfig 
             unsupported.append(f"{ae.type}:{val}")
 
     overall = sum(covered_by_type.values()) / sum(total_by_type.values())
-    by_type = {k: covered_by_type.get(k, 0) / v for k, v in total_by_type.items()}
+    # Tri-state entity presence/match per type
+    all_types: List[EntityType] = ["MONEY","NUMBER","PERCENT","DATE","QUANTITY","PHONE"]
+    presence_by_type = {t: int(total_by_type.get(t, 0) > 0) for t in all_types}
+    state_by_type: Dict[str, float] = {}
+    for t in all_types:
+        tot = total_by_type.get(t, 0)
+        if tot == 0:
+            state = -1.0
+        else:
+            rate = covered_by_type.get(t, 0) / tot
+            state = 1.0 if rate == 1.0 else 0.0
+        state_by_type[t] = state
     return {
         "match": {
             "overall": round(overall, 4),
-            "by_type": {k: round(v, 4) for k, v in by_type.items()},
-            "unsupported": unsupported
+            # removed: per-type coverage in favor of tri-state
+            "unsupported": unsupported,
+            "presence_by_type": presence_by_type,
+            "state_by_type": state_by_type,
         },
         "supported_entities": {
             "items": supported_items,
@@ -638,7 +712,7 @@ def context_utilization_report_with_entities(
     answer: str,
     retrieved_contexts: List[str],
     use_bm25_for_best: bool = True,
-    use_embed_alignment: bool = False,    # set True if sentence-transformers installed
+    use_embed_alignment: bool = True,    # set True if sentence-transformers installed
     embed_term_threshold: float = 0.5,
     extractor_config: Optional[ExtractorConfig] = None,
     metrics_config: Optional[Dict[str, bool]] = None
@@ -846,15 +920,6 @@ def context_utilization_report_with_entities(
         quickwin["a_len"] = float(len(a_terms))
     if _is_enabled(metrics_config, "qa_len_ratio"):
         quickwin["qa_len_ratio"] = round(float(len(a_terms) / max(1, len(q_terms))), 4)
-    # 6) Entity-type coverage shape (defaults to 0.0 if missing)
-    by_type_cov = (entity_match.get("by_type", {}) if entity_match else {})
-    def _bt(name):
-        return float(by_type_cov.get(name, 0.0) or 0.0)
-    if _is_enabled(metrics_config, "money_cov"):    quickwin["money_cov"] = _bt("MONEY")
-    if _is_enabled(metrics_config, "number_cov"):   quickwin["number_cov"] = _bt("NUMBER")
-    if _is_enabled(metrics_config, "percent_cov"):  quickwin["percent_cov"] = _bt("PERCENT")
-    if _is_enabled(metrics_config, "date_cov"):     quickwin["date_cov"] = _bt("DATE")
-    if _is_enabled(metrics_config, "quantity_cov"): quickwin["quantity_cov"] = _bt("QUANTITY")
     # 7) Per-sentence summary stats
     if _is_enabled(metrics_config, "min_sentence_precision"):
         quickwin["min_sentence_precision"] = round(float(min_sentence_precision), 4)
@@ -954,7 +1019,7 @@ def calculate_context_utilization_percentage(
         answer=answer,
         retrieved_contexts=context_snippets,
         use_bm25_for_best=True,
-        use_embed_alignment=False,
+        use_embed_alignment=True,
         extractor_config=None,  # or pass a custom ExtractorConfig
         metrics_config=metrics_config,
     )

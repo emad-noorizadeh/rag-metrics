@@ -1,0 +1,35 @@
+{
+  "bestC": 10.0,
+  "final_threshold": 0.752696324668014,
+  "n_train": 281,
+  "feature_names_count": 60,
+  "feature_fingerprint": "0e33ccf00d3d96543b6cdc243faf9d1d83fe5d55b701a84a1b06e4ab62054a66",
+  "solver": "lbfgs",
+  "penalty": "l2",
+  "standardize": true,
+  "class_weight": "balanced",
+  "max_iter": 2000,
+  "tag": "v1.0-trainset_v1",
+  "use_embed_alignment": true,
+  "featurization_meta": {
+    "feature_config": {
+      "drop": [],
+      "keep_prefixes": null
+    },
+    "metrics_config": {
+      "enable_pos_metrics": true,
+      "enable_inference_signal": true
+    },
+    "boolean_allowlist": [
+      "inference_likely"
+    ]
+  },
+  "test": {
+    "f1": 0.8210526315789474,
+    "pr_auc": 0.9288342067341454,
+    "roc_auc": 0.9285714285714285,
+    "brier": 0.11429232942495371,
+    "precision": 0.8478260869565217,
+    "recall": 0.7959183673469388
+  }
+}

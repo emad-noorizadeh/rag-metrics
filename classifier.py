@@ -5,6 +5,9 @@ import re
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 
+import pickle
+import hashlib
+
 # uses your existing file
 from metric_utils import context_utilization_report_with_entities
 
@@ -253,6 +256,23 @@ class FeatureConfig:
             keys = [k for k in keys if not any(r.search(k) for r in deny_re)]
         return {k: feats[k] for k in keys}
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "allowlist": list(self.allowlist),
+            "denylist": list(self.denylist),
+            "allow_patterns": list(self.allow_patterns),
+            "deny_patterns": list(self.deny_patterns),
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "FeatureConfig":
+        return cls(
+            allowlist=d.get("allowlist", []),
+            denylist=d.get("denylist", []),
+            allow_patterns=d.get("allow_patterns", []),
+            deny_patterns=d.get("deny_patterns", []),
+        )
+
 
 # -----------------------------------------------------------------
 # 4) Report wrapper → flattened feature vector (with config toggles)
@@ -263,6 +283,7 @@ def extract_features_all(
     ctx: List[str],
     metrics_config: Optional[Dict[str, Any]] = None,
     feature_config: Optional[FeatureConfig] = None,
+    boolean_allowlist: Iterable[str] = (),
 ) -> Tuple[np.ndarray, Dict[str, Any], List[str]]:
     rep = context_utilization_report_with_entities(
         question=q,
@@ -272,13 +293,13 @@ def extract_features_all(
         use_embed_alignment=False,       # no embeddings by default (portable)
         metrics_config=metrics_config,   # pass caller’s toggles for quick-wins etc.
     )
-    
+
     flat = _flatten_report(
-    rep,
-    prefix="",
-    include_list_lengths=True,
-    include_numeric_list_stats=True,
-    include_boolean_allowlist=("inference_likely",)
+        rep,
+        prefix="",
+        include_list_lengths=True,
+        include_numeric_list_stats=True,
+        include_boolean_allowlist=tuple(boolean_allowlist),
     )
     if feature_config:
         flat = feature_config.filter(flat)
@@ -298,6 +319,9 @@ class RagFaithfulnessClassifier:
     C: float = 1.0                           # logistic regularization strength
     feature_config: FeatureConfig = field(default_factory=FeatureConfig)
     metrics_config: Optional[Dict[str, Any]] = None  # forwarded to report
+    boolean_allowlist: Iterable[str] = field(default_factory=lambda: ("inference_likely",))
+    feature_fingerprint: Optional[str] = None
+    metrics_config_snapshot: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         # balanced = robust with small or skewed datasets
@@ -312,6 +336,7 @@ class RagFaithfulnessClassifier:
                 r["q"], r["a"], r["c"],
                 metrics_config=self.metrics_config,
                 feature_config=self.feature_config,
+                boolean_allowlist=self.boolean_allowlist,
             )
             if feature_names_ref is None:
                 feature_names_ref = names
@@ -354,6 +379,11 @@ class RagFaithfulnessClassifier:
         if X.shape[1] == 0:
             raise RuntimeError("No numeric features after filtering.")
         self.model.fit(X, y)
+        self.feature_names_ = self.feature_names_ or []
+        names_bytes = ("\n".join(self.feature_names_)).encode("utf-8")
+        self.feature_fingerprint = hashlib.sha256(names_bytes).hexdigest()[:16]
+        # keep a snapshot of configs that affect featurization
+        self.metrics_config_snapshot = (self.metrics_config.copy() if isinstance(self.metrics_config, dict) else None)
         return self
 
     def predict_proba(self, q: str, a: str, ctx: List[str]) -> Tuple[float, Dict[str, Any]]:
@@ -361,7 +391,14 @@ class RagFaithfulnessClassifier:
             q, a, ctx,
             metrics_config=self.metrics_config,
             feature_config=self.feature_config,
+            boolean_allowlist=self.boolean_allowlist,
         )
+        # Sanity check: warn if live feature set differs from training set
+        if hasattr(self, "feature_names_") and self.feature_names_:
+            if names != self.feature_names_:
+                # Reprojection will handle alignment, but we can log a hint for debugging
+                # (print-based since we avoid logging deps)
+                print("[RagFaithfulnessClassifier] Note: feature set at inference differs from training; aligning by name.")
         # align to training feature order
         x = self._reproject(x, names, self.feature_names_)
         p = float(self.model.predict_proba([x])[0, 1])
@@ -372,11 +409,87 @@ class RagFaithfulnessClassifier:
             if isinstance(unr, (int, float)) and unr > 0:
                 p = min(p, 0.20)  # clip; or set to 0.0 for hard fail
         return p, rep
+    def export_payload(self, threshold: float = 0.5) -> Dict[str, Any]:
+        """Package the fitted sklearn model and all featurization metadata.
+        Use this when saving with pickle/json so train/inference stay in sync.
+        """
+        return {
+            "sklearn_lr": self.model,
+            "feature_names": list(self.feature_names_),
+            "threshold": float(getattr(self, "_inference_threshold", threshold)),
+            "C": float(self.C),
+            "feature_config": self.feature_config.to_dict(),
+            "metrics_config": (self.metrics_config.copy() if isinstance(self.metrics_config, dict) else None),
+            "boolean_allowlist": list(self.boolean_allowlist),
+            "feature_fingerprint": self.feature_fingerprint,
+        }
 
     def predict(self, q: str, a: str, ctx: List[str], threshold: float = 0.5) -> int:
         p, _ = self.predict_proba(q, a, ctx)
         return int(p >= threshold)
 
+
+    # ----- New: attach a fitted sklearn LR + metadata -----
+    def attach_fitted(
+        self,
+        sklearn_lr: Any,
+        feature_names: List[str],
+        threshold: float = 0.5,
+        C: Optional[float] = None,
+    ):
+        """
+        Attach a pre-trained LogisticRegression and its metadata.
+        """
+        self.model = sklearn_lr
+        self.feature_names_ = list(feature_names)
+        if C is not None:
+            self.C = float(C)
+        self._inference_threshold = float(threshold)
+        return self
+
+    # ----- New: load from pickle produced by eval_kfold.py -----
+    @classmethod
+    def load_from_pickle(
+        cls,
+        path: str,
+        strict_numeric_gate: bool = True,
+        feature_config: Optional["FeatureConfig"] = None,
+        metrics_config: Optional[Dict[str, Any]] = None,
+    ) -> "RagFaithfulnessClassifier":
+        """
+        Load an artifact saved by scripts/eval_kfold.py (payload contains:
+        sklearn_lr, feature_names, threshold, C).
+        """
+        with open(path, "rb") as f:
+            payload = pickle.load(f)
+
+        feature_cfg = FeatureConfig.from_dict(payload.get("feature_config", {}))
+        clf = cls(
+            strict_numeric_gate=strict_numeric_gate,
+            C=float(payload.get("C", 1.0)),
+            feature_config=feature_cfg,
+            metrics_config=metrics_config if metrics_config is not None else payload.get("metrics_config", None),
+            boolean_allowlist=tuple(payload.get("boolean_allowlist", ("inference_likely",))),
+        )
+        clf.attach_fitted(
+            sklearn_lr=payload["sklearn_lr"],
+            feature_names=payload["feature_names"],
+            threshold=float(payload.get("threshold", 0.5)),
+            C=float(payload.get("C", 1.0)),
+        )
+        clf.feature_fingerprint = payload.get("feature_fingerprint")
+        clf.metrics_config_snapshot = payload.get("metrics_config")
+        return clf
+
+    # ----- Optional: prediction using the stored threshold -----
+    def predict_with_saved_threshold(self, q: str, a: str, ctx: List[str]) -> int:
+        if not hasattr(self, "_inference_threshold"):
+            # fallback if you didn't load a model that provided threshold
+            thr = 0.5
+        else:
+            thr = float(self._inference_threshold)
+        p, _ = self.predict_proba(q, a, ctx)
+        return int(p >= thr)
 
 # -----------------------------
 # 6) Quick smoke train & test
@@ -412,6 +525,7 @@ if __name__ == "__main__":
         C=1.0,
         feature_config=feature_cfg,
         metrics_config=metrics_cfg,
+        boolean_allowlist=("inference_likely",),
     ).fit(train_rows)
 
     print(f"Num features used: {len(clf.feature_names_)}")

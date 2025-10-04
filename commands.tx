@@ -1,0 +1,41 @@
+To create train data:
+python data_processing.py --data-dir data --out-prefix data/processed/train_v1 \
+  --enable-pos-metrics --enable-inference-signal
+
+
+To create test data:
+
+python data_processing.py --data-dir data/test --out-prefix data/processed/test_v1 \                
+  --enable-pos-metrics --enable-inference-signal    
+
+
+To train
+Here’s the final optimized eval_kfold command you should use — 
+incorporating all your latest updates (standardization, balanced class weights, 
+higher iterations, embed alignment enabled in features, tagging, etc.):
+
+python eval_kfold.py \
+  --train-npz data/processed/train_v1.npz \
+  --test-npz  data/processed/test_v1.npz \
+  --Cs 0.1,0.3,1,3,10 \
+  --n-splits 5 \
+  --objective f1 \
+  --min-precision 0.90 \
+  --seed 42 \
+  --standardize \
+  --max-iter 2000 \
+  --solver lbfgs --penalty l2 --class-weight balanced \
+  --use-embed-alignment \
+  --save-model artifacts/lr_model_v1.pkl \
+  --save-report artifacts/cv_report_v1.json \
+  --featurization-meta artifacts/featurization_meta.json \
+  --tag "v1.0-trainset_v1"
+
+✅ Explanation of key flags
+	•	--standardize → scales your features before fitting.
+	•	--class-weight balanced → compensates for label imbalance.
+	•	--use-embed-alignment → enables MiniLM semantic features in training.
+	•	--featurization-meta → ensures your RagFaithfulnessClassifier uses the exact same feature set at inference time.
+	•	--tag → attaches a logical version label to your experiment.
+
+This is the version you can treat as your canonical training/evaluation run for reproducible results.

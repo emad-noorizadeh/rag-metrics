@@ -628,26 +628,33 @@ def main():
     data = validate_items(data)
 
     # 5) Append fixed text *into* every context entry
+    # FIXED_TEXTS = [
+    #     "Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged "
+    #     "the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a "
+    #     "non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal "
+    #     "and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards "
+    #     "Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not "
+    #     "charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs "
+    #     "in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and "
+    #     "transfers from non-Bank of America ATMs in the U.S.",
+
+    #     "Preferred Rewards members who apply for an Auto purchase or refinance loan receive an interest rate "
+    #     "discount of 0.25% for Gold tier, 0.35% for Platinum tier, and 0.50% for Platinum Honors and higher "
+    #     "based on their Preferred Rewards tier at the time of auto loan application. The maximum Preferred "
+    #     "Rewards interest rate discount on a Bank of America auto loan is 0.50%. This interest rate discount "
+    #     "is not reflected in all our published rates on our website but will be confirmed and reflected in "
+    #     "the interest rate quoted upon loan approval. Discounts are only available on auto loan applications "
+    #     "submitted by you directly to Bank of America through its website, Financial Centers, or Bank call "
+    #     "centers. Discounts are not available for motor vehicle leases or for applications sourced from car "
+    #     "dealerships, car manufacturers, or third-party branded/co-branded relationships. Benefit is "
+    #     "non-transferable. Subject to credit approval. Standard underwriting guidelines and credit policies apply."
+    # ]
+
     FIXED_TEXTS = [
         "Preferred Rewards Platinum tier members using a Bank of America Debit or ATM card are not charged "
         "the non-Bank of America ATM fee for one withdrawal and one transfer per statement cycle from a "
         "non-Bank of America ATM in the U.S., and receive a refund of the ATM operator fee for one withdrawal "
         "and one transfer per statement cycle from a non-Bank of America ATM in the U.S. Preferred Rewards "
-        "Platinum Honors and Diamond Honors tier members using a Bank of America Debit or ATM card are not "
-        "charged the non-Bank of America ATM fee for withdrawals and transfers from non-Bank of America ATMs "
-        "in the U.S. and U.S. territories and receive a refund of the ATM operator fee for withdrawals and "
-        "transfers from non-Bank of America ATMs in the U.S.",
-
-        "Preferred Rewards members who apply for an Auto purchase or refinance loan receive an interest rate "
-        "discount of 0.25% for Gold tier, 0.35% for Platinum tier, and 0.50% for Platinum Honors and higher "
-        "based on their Preferred Rewards tier at the time of auto loan application. The maximum Preferred "
-        "Rewards interest rate discount on a Bank of America auto loan is 0.50%. This interest rate discount "
-        "is not reflected in all our published rates on our website but will be confirmed and reflected in "
-        "the interest rate quoted upon loan approval. Discounts are only available on auto loan applications "
-        "submitted by you directly to Bank of America through its website, Financial Centers, or Bank call "
-        "centers. Discounts are not available for motor vehicle leases or for applications sourced from car "
-        "dealerships, car manufacturers, or third-party branded/co-branded relationships. Benefit is "
-        "non-transferable. Subject to credit approval. Standard underwriting guidelines and credit policies apply."
     ]
 
     fixed_passage = rng.choice(FIXED_TEXTS)

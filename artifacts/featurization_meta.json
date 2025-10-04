@@ -1,0 +1,11 @@
+{
+  "feature_config": {
+    "drop": [], 
+    "keep_prefixes": null
+  },
+  "metrics_config": {
+    "enable_pos_metrics": true,
+    "enable_inference_signal": true
+  },
+  "boolean_allowlist": ["inference_likely"]
+}

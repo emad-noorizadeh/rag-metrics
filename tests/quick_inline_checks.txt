@@ -1,0 +1,114 @@
+Here are a few quick, copy-pasteable ways to smoke-test your metric_utils.py from the terminal.
+
+1) Tiny inline test (here-doc)
+
+This runs a short script without creating a file:
+
+python - <<'PY'
+from metric_utils import context_utilization_report_with_entities
+
+q = "What was the 2023 revenue and guidance?"
+a = "Revenue was $5.2B and guidance is 12% growth."
+ctx = [
+  "In 2023, the company reported revenue of $5.2B.",
+  "Management expects growth of 12 percent next year."
+]
+
+rep = context_utilization_report_with_entities(
+    question=q,
+    answer=a,
+    retrieved_contexts=ctx,
+    use_bm25_for_best=True,      # BM25 select best context
+    use_embed_alignment=True,    # uses your MiniLM if available
+    metrics_config={"enable_pos_metrics": True, "enable_inference_signal": True}
+)
+
+print("precision_token:", rep["precision_token"])
+print("recall_context:", rep["recall_context"])
+print("numeric_match:", rep["numeric_match"])
+print("entity_match.overall:", rep["entity_match"]["overall"])
+print("qr_alignment.cosine_tfidf:", rep["qr_alignment"]["cosine_tfidf"])
+print("qr_alignment.cosine_embed:", rep["qr_alignment"]["cosine_embed"])
+print("context_alignment.answer_context_similarity:", rep["context_alignment"]["answer_context_similarity"])
+print("content_precision_token:", rep.get("content_precision_token"))
+print("inference_likely:", rep.get("inference_likely"), "| score:", rep.get("inference_score"))
+print("summary:", rep["summary"])
+PY
+
+2) One-liner style (very quick)
+
+python -c "from metric_utils import calculate_context_utilization_percentage as f; print(f('Revenue was \$5.2B and guidance is 12% growth.', ['FY23 revenue \$5.2B per 10-K','Guidance midpoint 12%']).get('summary'))"
+
+3) Test the POS/inference flags explicitly
+
+python - <<'PY'
+from metric_utils import context_utilization_report_with_entities
+
+q="What was the 2023 revenue and guidance?"
+a="They delivered five-point-two billion in revenue and are guiding low double digits."
+ctx=["In 2023, the company reported revenue of $5.2B.",
+     "Management expects growth of 12 percent next year."]
+
+rep = context_utilization_report_with_entities(
+  question=q, answer=a, retrieved_contexts=ctx,
+  use_embed_alignment=True,
+  metrics_config={"enable_pos_metrics": True, "enable_inference_signal": True}
+)
+print("content_precision_token:", rep["content_precision_token"])
+print("inference_likely:", rep["inference_likely"], "score:", rep["inference_score"])
+print("unsupported_terms:", rep["unsupported_terms"])
+PY
+
+4) If you see ModuleNotFoundError: No module named 'metric_utils'
+
+Run from the repo root and ensure the current directory is on PYTHONPATH:
+
+# from the repo root:
+export PYTHONPATH=.
+python - <<'PY'
+import metric_utils
+print("Loaded:", metric_utils.__file__)
+PY
+
+5) Quick check that embeddings load (MiniLM local path)
+
+If you have the model under models/all-MiniLM-L6-v2, you should see non-None embed scores:
+
+python - <<'PY'
+from metric_utils import context_utilization_report_with_entities
+rep = context_utilization_report_with_entities(
+  question="What is guidance?",
+  answer="Guidance is 12% growth next year.",
+  retrieved_contexts=["Management expects growth of 12 percent next year."],
+  use_embed_alignment=True
+)
+print("embed QA cosine:", rep["qr_alignment"]["cosine_embed"])
+print("embed A↔C avg:", rep["context_alignment"]["answer_context_similarity"])
+PY
+
+Tip: If those show None, the sentence-transformers model wasn’t found/loaded. Make sure the folder exists at models/all-MiniLM-L6-v2 or set it inside the code where _maybe_load_embedder is called.
+
+That’s it! These are safe to run anytime from your venv.
+
+
+A couple of handy inline tests you can keep using
+	•	Answer-only wrapper (will always show Q↔A tfidf 0.0):
+
+python -c "from metric_utils import calculate_context_utilization_percentage as f; \
+print(f('Revenue was \$5.2B and guidance is 12% growth.', ['FY23 revenue \$5.2B per 10-K','Guidance midpoint 12%'])['summary'])"
+
+	•	Full report with embeddings and POS/inference:
+
+python - <<'PY'
+from metric_utils import context_utilization_report_with_entities
+q="What was the 2023 revenue and guidance?"
+a="Revenue was $5.2B and guidance is 12% growth."
+ctx=["In 2023, the company reported revenue of $5.2B.",
+     "Management expects growth of 12 percent next year."]
+rep = context_utilization_report_with_entities(q,a,ctx,use_embed_alignment=True,
+    metrics_config={"enable_pos_metrics": True, "enable_inference_signal": True})
+print(rep["summary"])
+print("QA embed:", rep["qr_alignment"]["cosine_embed"], "| A↔C embed:", rep["context_alignment"]["answer_context_similarity"])
+PY
+
+Anything else you want to probe (e.g., cranking the inference heuristic or toggling features), say the word and I’ll drop a ready-to-run snippet.
