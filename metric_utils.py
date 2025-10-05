@@ -724,16 +724,34 @@ def context_utilization_report_with_entities(
 
     def _is_enabled(cfg: Optional[Dict[str, bool]], name: str, default: bool = True) -> bool:
         return default if cfg is None else bool(cfg.get(name, default))
-    # Build extractor config (or use default)
+    # Build extractor config (or use default). We now enable spaCy-fusion by default
+    # so you benefit from the fusion scorer/overlap-suppression automatically when
+    # spaCy is installed; extractor will silently no-op if spaCy is missing.
     ex_cfg = extractor_config or ExtractorConfig(
         enable_money=True,
         enable_date=True,
-        enable_quantity=True,   # safe: now regex+table
+        enable_quantity=True,   # safe: regex+unit-table
         enable_phone=False,
         enable_number=True,
         enable_percent=True,
-        timezone="UTC",         # change if you prefer different timezone
+        timezone="UTC",
+        # NEW: fusion knobs (ExtractorConfig supports these; harmless if absent)
+        use_spacy_fusion=True,
+        prefer_deterministic=True,
     )
+    # Allow a simple switch via metrics_config without requiring callers to
+    # construct an ExtractorConfig explicitly.
+    if metrics_config is not None:
+        if "use_spacy_fusion" in metrics_config:
+            try:
+                setattr(ex_cfg, "use_spacy_fusion", bool(metrics_config["use_spacy_fusion"]))
+            except Exception:
+                pass
+        if "prefer_deterministic" in metrics_config:
+            try:
+                setattr(ex_cfg, "prefer_deterministic", bool(metrics_config["prefer_deterministic"]))
+            except Exception:
+                pass
 
     # Edge: no answer
     if not answer or not answer.strip():
