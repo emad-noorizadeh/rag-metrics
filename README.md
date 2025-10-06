@@ -30,9 +30,20 @@ inference.
    python -m spacy download en_core_web_sm
    ```
 
-2. If you want to keep the sentence-transformer weights outside the repo, set
-   `RAG_MODELS_DIR=/path/to/models` (or `MODELS_DIR`) and place
-   `all-MiniLM-L6-v2/` there. The loader checks that location automatically.
+2. Download the MiniLM checkpoint and point the loader at it. Either:
+
+   ```bash
+   mkdir -p /opt/models
+   git clone https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2 \
+     /opt/models/all-MiniLM-L6-v2
+   export RAG_MODELS_DIR=/opt/models
+   ```
+
+   or copy the extracted folder somewhere convenient and set
+   `RAG_MODELS_DIR` (or `MODELS_DIR`) to that directory in your shell / service
+   environment. `_maybe_load_embedder` will look there first, then fall back to
+   `../models/all-MiniLM-L6-v2/` or `./models/all-MiniLM-L6-v2/` relative to the
+   repo if no env variable is set.
 
 ### 1. Entity Extraction (`extractor.py`)
 

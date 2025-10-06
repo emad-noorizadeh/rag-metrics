@@ -9,7 +9,7 @@ sentence-transformers>=2.2
 spacy>=3.7,<3.9
 
 # Optional extractors (gracefully degrade if missing)
-price-parser>=1.2
+price-parser>=0.4
 number-parser>=0.3
 phonenumbers>=8.13
 

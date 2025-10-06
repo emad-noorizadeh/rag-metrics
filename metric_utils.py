@@ -543,6 +543,10 @@ def _maybe_load_embedder(path: str = "models/all-MiniLM-L6-v2"):
             if path:
                 candidates.append(os.path.normpath(os.path.join(repo_root, path)))
 
+        repo_parent = os.path.dirname(repo_root)
+        if path:
+            candidates.append(os.path.normpath(os.path.join(repo_parent, path)))
+
         for cand in candidates:
             if cand and os.path.exists(cand):
                 _EMB = SentenceTransformer(cand, device="cpu")
