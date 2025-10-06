@@ -382,10 +382,11 @@ def main():
                         _extractor_mod._SPACY_NLP is not None,
                     )
                     if _extractor_mod._SPACY_NLP is not None:
-                        logger.info(
-                            "spaCy pipeline components: %s",
-                            _extractor_mod._SPACY_NLP.pipe_names,
-                        )
+                        try:
+                            pipe_names = list(_extractor_mod._SPACY_NLP.pipe_names)
+                        except AttributeError:
+                            pipe_names = [name for name, _ in getattr(_extractor_mod._SPACY_NLP, "pipeline", [])]
+                        logger.info("spaCy pipeline components: %s", pipe_names)
                     if True:
                         spacy_only = _extract_spacy(ex.get("a", ""), extractor_cfg_for_test)
                         logger.info("_extract_spacy direct -> %s", [(e.type, e.source) for e in spacy_only])
