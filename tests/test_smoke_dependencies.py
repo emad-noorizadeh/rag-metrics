@@ -11,9 +11,23 @@ def test_spacy_version():
 
 
 def test_sentence_transformers():
+    import os
+    import pytest
     from sentence_transformers import SentenceTransformer
 
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    model_path = None
+    for env_var in ("RAG_MODELS_DIR", "MODELS_DIR"):
+        base = os.environ.get(env_var)
+        if base:
+            candidate = os.path.join(base, "all-MiniLM-L6-v2")
+            if os.path.exists(candidate):
+                model_path = candidate
+                break
+
+    if model_path is None:
+        pytest.skip("SentenceTransformer model cache not available; set RAG_MODELS_DIR for full smoke test")
+
+    model = SentenceTransformer(model_path)
     emb = model.encode(["smoke test"], normalize_embeddings=True)
     assert emb.shape[0] == 1
 
@@ -23,4 +37,3 @@ def test_dateparser_roundtrip():
 
     dt = dateparser.parse("September 20, 2023", settings={"TIMEZONE": "UTC"})
     assert dt is not None and dt.year == 2023
-
