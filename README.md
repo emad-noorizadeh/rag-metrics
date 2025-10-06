@@ -208,10 +208,10 @@ To score a single raw QA trace end-to-end:
 2. **Featurize** with the same flags used during training:
 
    ```bash
-   /Users/emadn/Projects/pipven/bin/python data_processing.py \
-     --data-dir samples --pattern "single.json" \
-     --out-prefix artifacts/single_run \
-     --use-spacy-fusion --enable-pos-metrics --enable-entity-report
+/Users/emadn/Projects/pipven/bin/python data_processing.py \
+  --data-dir samples --pattern "single.json" \
+  --out-prefix artifacts/single_run \
+  --use-spacy-fusion --enable-pos-metrics --enable-entity-report
    ```
 
    This emits `artifacts/single_run.csv` (for inspection) and
@@ -230,6 +230,16 @@ To score a single raw QA trace end-to-end:
    The JSONL output reports the probability (`p`) and binary prediction
    (`yhat`) for each row, along with the original question/answer text. The
    threshold used comes from the saved classifier artifact.
+
+If you need to mix source types (e.g., JSON plus the CSV fixture in
+`tests/data/sample_inputs.csv`), pass a comma-separated glob:
+
+```
+/Users/emadn/Projects/pipven/bin/python data_processing.py \
+  --data-dir tests/data --pattern "*.json,*.csv" \
+  --out-prefix artifacts/train_combo \
+  --use-spacy-fusion --enable-pos-metrics --enable-entity-report
+```
 
 For a pure metric dump (without classification), use
 `demo/run_full_report.py --input demo/example.json --pretty` on a single example

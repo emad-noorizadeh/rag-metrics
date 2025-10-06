@@ -1,6 +1,6 @@
 # data_processing.py
 from __future__ import annotations
-import os, glob, json, argparse
+import os, glob, json, csv, argparse
 from typing import Any, Dict, List, Iterable, Tuple, Optional
 from dataclasses import dataclass, field
 import numpy as np
@@ -86,23 +86,66 @@ def load_examples_from_folder(data_dir: str, pattern: str = "*.json") -> List[Di
     Reads every JSON file in `data_dir` that matches `pattern`.
     Each file must contain a JSON array of items with fields: q, a, c (list[str]), y (0/1).
     """
-    paths = sorted(glob.glob(os.path.join(data_dir, pattern)))
+    pattern_list = [p.strip() for p in pattern.split(",") if p.strip()]
+    if not pattern_list:
+        pattern_list = ["*.json"]
+    seen = set()
+    paths: List[str] = []
+    for pat in pattern_list:
+        for candidate in sorted(glob.glob(os.path.join(data_dir, pat))):
+            if candidate not in seen:
+                seen.add(candidate)
+                paths.append(candidate)
     items: List[Dict[str, Any]] = []
     for p in paths:
-        with open(p, "r", encoding="utf-8") as f:
-            try:
-                arr = json.load(f)
+        ext = os.path.splitext(p)[1].lower()
+        try:
+            if ext == ".json":
+                with open(p, "r", encoding="utf-8") as f:
+                    arr = json.load(f)
                 if not isinstance(arr, list):
                     raise ValueError(f"{p} does not contain a JSON array.")
                 for i, ex in enumerate(arr):
-                    # minimal validation
-                    if not {"q","a","c","y"}.issubset(ex):
+                    if not {"q", "a", "c", "y"}.issubset(ex):
                         raise ValueError(f"{p}[{i}] missing required keys.")
                     if not isinstance(ex["c"], list):
                         raise ValueError(f"{p}[{i}] 'c' must be a list of strings.")
                     items.append(ex)
-            except Exception as e:
-                raise RuntimeError(f"Failed to parse {p}: {e}")
+            elif ext == ".csv":
+                with open(p, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for i, row in enumerate(reader):
+                        question = row.get("question")
+                        answer = row.get("answer")
+                        if question is None or answer is None:
+                            raise ValueError(f"{p}[{i}] missing 'question' or 'answer'")
+                        chunk_cols = [col for col in row.keys() if col.lower().startswith("chunk") and row[col]]
+                        def _chunk_key(name: str) -> Tuple[int, str]:
+                            suffix = name[len("chunk"):]
+                            try:
+                                return (int(suffix), "")
+                            except ValueError:
+                                return (1_000_000, suffix)
+                        chunks = [row[col] for col in sorted(chunk_cols, key=_chunk_key)]
+                        abstained_raw = row.get("abstained", "false").strip().lower()
+                        # Interpret abstain=True as ungrounded (y=0) unless domain says otherwise.
+                        abstained = abstained_raw in {"true", "1", "yes"}
+                        y = 0 if abstained else 1
+                        ex = {
+                            "q": question,
+                            "a": answer,
+                            "c": chunks,
+                            "y": y,
+                            "meta": {
+                                "abstained": abstained,
+                                "answer_type": row.get("answer_type"),
+                            },
+                        }
+                        items.append(ex)
+            else:
+                raise ValueError(f"Unsupported file extension: {ext}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to parse {p}: {e}")
     return items
 
 # ---------- Featurization ----------
@@ -193,7 +236,11 @@ def featurize_dataset(
             flat = feature_config.filter(flat)
         flat_list.append(flat)
         y_list.append(y)
-        meta.append({"q": ex["q"], "a": ex["a"], "y": y})
+        meta_entry = {"q": ex["q"], "a": ex["a"], "y": y}
+        if isinstance(ex, dict) and isinstance(ex.get("meta"), dict):
+            meta_entry["answer_type"] = ex["meta"].get("answer_type")
+            meta_entry["abstained"] = ex["meta"].get("abstained")
+        meta.append(meta_entry)
         if "product launch event" in (ex.get("q", "") or "").lower():
             logger.info(
                 "Debug entity stats for question=%r: answer=%r DATE_len=%s presence=%s supported=%s extractor_date=%s spacy_fusion=%s rep=%s",
@@ -236,8 +283,9 @@ def save_csv(
     """
     # Write CSV manually to avoid pandas dependency if you prefer
     os.makedirs(os.path.dirname(out_csv), exist_ok=True)
+    extra_cols = ["answer_type", "abstained"]
     with open(out_csv, "w", encoding="utf-8") as f:
-        header = feature_names + ["y", "q", "a"]
+        header = feature_names + ["y", "q", "a"] + extra_cols
         f.write(",".join([json.dumps(h)[1:-1] if ("," in h or "." in h) else h for h in header]) + "\n")
         for i in range(X.shape[0]):
             row_vals: List[str] = []
@@ -249,6 +297,12 @@ def save_csv(
             ai = json.dumps(meta[i]["a"])
             row_vals.append(qi)
             row_vals.append(ai)
+            row_vals.append(json.dumps(meta[i].get("answer_type"))[1:-1] if meta[i].get("answer_type") else "")
+            abstained_val = meta[i].get("abstained")
+            if abstained_val is None:
+                row_vals.append("")
+            else:
+                row_vals.append("true" if abstained_val else "false")
             f.write(",".join(row_vals) + "\n")
 
 def save_npz(

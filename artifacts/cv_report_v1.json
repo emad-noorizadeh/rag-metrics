@@ -1,7 +1,7 @@
 {
-  "bestC": 3.0,
-  "final_threshold": 0.5715076154387433,
-  "n_train": 281,
+  "bestC": 10.0,
+  "final_threshold": 0.6660317903864171,
+  "n_train": 283,
   "feature_names_count": 72,
   "feature_fingerprint": "e8b783b577ce3d1b258793744febda3480f75e99119ec08bbc56d5b190b82500",
   "solver": "lbfgs",
@@ -9,7 +9,7 @@
   "standardize": true,
   "class_weight": "balanced",
   "max_iter": 2000,
-  "tag": "v1.0-trainset_v3",
+  "tag": "v1.0-trainset_v4",
   "use_embed_alignment": true,
   "featurization_meta": {
     "feature_config": {
@@ -25,11 +25,11 @@
     ]
   },
   "test": {
-    "f1": 0.9306930693069307,
-    "pr_auc": 0.8897334545113667,
-    "roc_auc": 0.9443027210884354,
-    "brier": 0.06264303236724572,
-    "precision": 0.9038461538461539,
-    "recall": 0.9591836734693877
+    "f1": 0.8934707903780069,
+    "pr_auc": 0.9591901267639582,
+    "roc_auc": 0.9618425053207662,
+    "brier": 0.06603347004882813,
+    "precision": 0.8783783783783784,
+    "recall": 0.9090909090909091
   }
 }

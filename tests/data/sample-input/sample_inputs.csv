@@ -1,0 +1,3 @@
+question,answer,chunk1,chunk2,abstained,answer_type
+"When was the product launch event held?","The product launch event was on September 20, 2023.","Event Summary: The product was officially launched on September 20, 2023.","Press Release: The launch attracted significant media attention.",False,fact
+"What was the revenue guidance?","Revenue guidance was 15% growth.","Earnings call: Management expects 12% growth next year.","Investor note: Revenue rose to $5.2B in 2023.",True,inference
