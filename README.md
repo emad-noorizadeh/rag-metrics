@@ -21,6 +21,19 @@ inference.
 
 ## Architecture Overview
 
+### Environment Setup
+
+1. Install Python dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   python -m spacy download en_core_web_sm
+   ```
+
+2. If you want to keep the sentence-transformer weights outside the repo, set
+   `RAG_MODELS_DIR=/path/to/models` (or `MODELS_DIR`) and place
+   `all-MiniLM-L6-v2/` there. The loader checks that location automatically.
+
 ### 1. Entity Extraction (`extractor.py`)
 
 The extractor merges deterministic pattern matchers with optional spaCy NER to
