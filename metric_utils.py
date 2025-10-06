@@ -523,8 +523,30 @@ def _maybe_load_embedder(path: str = "models/all-MiniLM-L6-v2"):
     try:
         from sentence_transformers import SentenceTransformer
         import os
-        if os.path.exists(path):
-            _EMB = SentenceTransformer(path, device="cpu")
+        candidates = []
+
+        # Absolute paths are tried as-is.
+        if path and os.path.isabs(path):
+            candidates.append(path)
+        else:
+            # Path relative to current working directory (legacy behaviour)
+            if path:
+                candidates.append(path)
+
+            # Path relative to env override
+            env_dir = os.environ.get("RAG_MODELS_DIR") or os.environ.get("MODELS_DIR")
+            if env_dir and path:
+                candidates.append(os.path.join(env_dir, path))
+
+            # Path relative to repo root (../models/…)
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            if path:
+                candidates.append(os.path.normpath(os.path.join(repo_root, path)))
+
+        for cand in candidates:
+            if cand and os.path.exists(cand):
+                _EMB = SentenceTransformer(cand, device="cpu")
+                break
         else:
             _EMB = None
     except Exception:

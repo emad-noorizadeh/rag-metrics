@@ -254,6 +254,10 @@ formatted as shown above; it calls the report directly without flattening.
   to `'UTC'` when `--timezone` is omitted so spaCy DATE parsing is deterministic.
 * **Skipped rows** – errors are skipped at featurization time and reported. Keep
   an eye on the warning count; a non-zero value suggests malformed inputs.
+* **Embedding models** – `_maybe_load_embedder` checks (in order) the path passed
+  in code, environment overrides `RAG_MODELS_DIR`/`MODELS_DIR`, and a repo-local
+  `../models/…` folder. Configure `RAG_MODELS_DIR` in production to point at the
+  shared checkpoint cache (e.g., `/opt/models`).
 
 ## Additional Notes
 
