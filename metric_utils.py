@@ -715,6 +715,7 @@ def context_utilization_report_with_entities(
     use_embed_alignment: bool = True,    # set True if sentence-transformers installed
     embed_term_threshold: float = 0.5,
     extractor_config: Optional[ExtractorConfig] = None,
+    timezone: str = "UTC",
     metrics_config: Optional[Dict[str, bool]] = None
 ) -> Dict[str, Any]:
     """
@@ -723,33 +724,57 @@ def context_utilization_report_with_entities(
     """
 
     def _is_enabled(cfg: Optional[Dict[str, bool]], name: str, default: bool = True) -> bool:
-        return default if cfg is None else bool(cfg.get(name, default))
+        if cfg is None:
+            return default
+        # Accept dict-like and SimpleNamespace-like configs
+        try:
+            if isinstance(cfg, dict):
+                return bool(cfg.get(name, default))
+            # fall back to getattr for SimpleNamespace or similar objects
+            return bool(getattr(cfg, name, default))
+        except Exception:
+            return default
     # Build extractor config (or use default). We now enable spaCy-fusion by default
     # so you benefit from the fusion scorer/overlap-suppression automatically when
     # spaCy is installed; extractor will silently no-op if spaCy is missing.
-    ex_cfg = extractor_config or ExtractorConfig(
-        enable_money=True,
-        enable_date=True,
-        enable_quantity=True,   # safe: regex+unit-table
-        enable_phone=False,
-        enable_number=True,
-        enable_percent=True,
-        timezone="UTC",
-        # NEW: fusion knobs (ExtractorConfig supports these; harmless if absent)
-        use_spacy_fusion=True,
-        prefer_deterministic=True,
+    ex_cfg = (
+        extractor_config
+        or (getattr(metrics_config, "extractor", None) if metrics_config is not None else None)
+        or ExtractorConfig(
+            enable_money=True,
+            enable_date=True,
+            enable_quantity=True,   # safe: regex+unit-table
+            enable_phone=False,
+            enable_number=True,
+            enable_percent=True,
+            timezone=timezone,
+            # NEW: fusion knobs (ExtractorConfig supports these; harmless if absent)
+            use_spacy_fusion=True,
+            prefer_deterministic=True,
+        )
     )
     # Allow a simple switch via metrics_config without requiring callers to
     # construct an ExtractorConfig explicitly.
     if metrics_config is not None:
-        if "use_spacy_fusion" in metrics_config:
+        mc = metrics_config
+
+        def _mc_get(name: str):
+            if isinstance(mc, dict):
+                return mc.get(name, None)
+            return getattr(mc, name, None)
+
+        # Optional overrides if provided directly at the top level
+        _val = _mc_get("use_spacy_fusion")
+        if _val is not None:
             try:
-                setattr(ex_cfg, "use_spacy_fusion", bool(metrics_config["use_spacy_fusion"]))
+                setattr(ex_cfg, "use_spacy_fusion", bool(_val))
             except Exception:
                 pass
-        if "prefer_deterministic" in metrics_config:
+
+        _val = _mc_get("prefer_deterministic")
+        if _val is not None:
             try:
-                setattr(ex_cfg, "prefer_deterministic", bool(metrics_config["prefer_deterministic"]))
+                setattr(ex_cfg, "prefer_deterministic", bool(_val))
             except Exception:
                 pass
 
@@ -948,7 +973,7 @@ def context_utilization_report_with_entities(
 
     # ---- POS-aware stats (optional spaCy)
     pos_stats = {}
-    if (metrics_config or {}).get("enable_pos_metrics", True):
+    if _is_enabled(metrics_config, "enable_pos_metrics", True):
         nlp = _maybe_load_spacy("en_core_web_sm")
         pos_stats = _pos_supported_stats(answer, retrieved_contexts, idf, nlp)
     else:
@@ -971,7 +996,7 @@ def context_utilization_report_with_entities(
         **pos_stats,
     }
     infer = {}
-    if (metrics_config or {}).get("enable_inference_signal", True):
+    if _is_enabled(metrics_config, "enable_inference_signal", True):
         infer = _inference_signal(tmp_rep_for_infer)
     else:
         infer = {"inference_likely": None, "inference_score": None, "inference_explanation": None}

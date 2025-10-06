@@ -9,6 +9,17 @@ python data_processing.py --data-dir data/test --out-prefix data/processed/test_
   --enable-pos-metrics --enable-inference-signal    
 
 
+/Users/emadn/Projects/pipven/bin/python data_processing.py \
+  --data-dir data --pattern '*.json' \
+  --out-prefix data/processed/train_v2 \
+  --use-spacy-fusion --enable-pos-metrics --enable-entity-report
+
+/Users/emadn/Projects/pipven/bin/python data_processing.py \
+  --data-dir data/test --pattern '*.json' \
+  --out-prefix data/processed/test_v2 \
+  --use-spacy-fusion --enable-pos-metrics --enable-entity-report
+
+
 To train
 Here’s the final optimized eval_kfold command you should use — 
 incorporating all your latest updates (standardization, balanced class weights, 
@@ -39,3 +50,7 @@ python eval_kfold.py \
 	•	--tag → attaches a logical version label to your experiment.
 
 This is the version you can treat as your canonical training/evaluation run for reproducible results.
+
+
+
+

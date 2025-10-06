@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 import numpy as np
 
 # Use your metrics report
+import logging
+
 from metric_utils import context_utilization_report_with_entities
+from shared_config import add_extractor_flags, metrics_config_from_args
 
 # ---------- small helpers ----------
 
@@ -111,20 +114,53 @@ def featurize_item(
     """
     Build report → flatten → return (flat_features, label, full_report) for a single item.
     """
-    rep = context_utilization_report_with_entities(
-        question=ex["q"],
-        answer=ex["a"],
-        retrieved_contexts=ex["c"],
-        use_bm25_for_best=True,
-        use_embed_alignment=False,
-        metrics_config=metrics_config,
-    )
+    logger = logging.getLogger(__name__)
+    try:
+        rep = context_utilization_report_with_entities(
+            question=ex.get("q", ""),
+            answer=ex.get("a", ""),
+            retrieved_contexts=ex.get("c", []) or [],
+            use_bm25_for_best=getattr(metrics_config, "use_bm25_for_best", True),
+            use_embed_alignment=getattr(metrics_config, "use_embed_alignment", True),
+            extractor_config=getattr(metrics_config, "extractor", None),
+            timezone=getattr(metrics_config, "timezone", "UTC"),
+            metrics_config=metrics_config,
+        )
+    except Exception:
+        logger.exception("context_utilization_report_with_entities failed for question=%r", ex.get("q", ""))
+        raise
     flat = _flatten_report(
         rep,
         include_list_lengths=True,
         include_numeric_list_stats=True,
         include_boolean_allowlist=("inference_likely",),
     )
+    enable_entity_report = True
+    if metrics_config is not None:
+        try:
+            if isinstance(metrics_config, dict):
+                enable_entity_report = bool(metrics_config.get("enable_entity_report", True))
+            else:
+                enable_entity_report = bool(getattr(metrics_config, "enable_entity_report", True))
+        except Exception:
+            enable_entity_report = True
+
+    if enable_entity_report:
+        # Expose per-type supported entity counts as flat features (e.g., entity_match.DATE__len)
+        se_by_type = ((rep.get("supported_entities") or {}).get("by_type") or {})
+        for t, cnt in se_by_type.items():
+            flat[f"entity_match.{t}__len"] = float(cnt)
+        # Ensure canonical types exist even if zero
+        for t in ("MONEY", "NUMBER", "PERCENT", "DATE", "QUANTITY", "PHONE"):
+            flat.setdefault(f"entity_match.{t}__len", 0.0)
+    else:
+        # Strip entity-derived features when reporting is disabled
+        entity_prefixes = ("entity_match.", "supported_entities.")
+        flat = {
+            k: v
+            for k, v in flat.items()
+            if not k.startswith(entity_prefixes) and k not in {"unsupported_entity_count"}
+        }
     y = int(ex["y"])
     return flat, y, rep
 
@@ -144,13 +180,39 @@ def featurize_dataset(
     y_list: List[int] = []
     meta: List[Dict[str, Any]] = []
 
-    for ex in data:
-        flat, y, _rep = featurize_item(ex, metrics_config=metrics_config)
+    logger = logging.getLogger(__name__)
+    skipped: List[Tuple[int, str]] = []
+    for idx, ex in enumerate(data):
+        try:
+            flat, y, _rep = featurize_item(ex, metrics_config=metrics_config)
+        except Exception:
+            logger.exception("Failed to featurize item index=%s question=%r; skipping", idx, ex.get("q", ""))
+            skipped.append((idx, ex.get("q", "")))
+            continue
         if feature_config:
             flat = feature_config.filter(flat)
         flat_list.append(flat)
         y_list.append(y)
         meta.append({"q": ex["q"], "a": ex["a"], "y": y})
+        if "product launch event" in (ex.get("q", "") or "").lower():
+            logger.info(
+                "Debug entity stats for question=%r: answer=%r DATE_len=%s presence=%s supported=%s extractor_date=%s spacy_fusion=%s rep=%s",
+                ex.get("q", ""),
+                ex.get("a", ""),
+                flat.get("entity_match.DATE__len"),
+                flat.get("entity_match.presence_by_type.DATE"),
+                ((_rep.get("supported_entities") or {}).get("by_type") if isinstance(_rep, dict) else None),
+                getattr(metrics_config, "extractor", None).enable_date if getattr(metrics_config, "extractor", None) else None,
+                getattr(metrics_config, "extractor", None).use_spacy_fusion if getattr(metrics_config, "extractor", None) else None,
+                _rep if isinstance(_rep, dict) else None,
+            )
+
+    if skipped:
+        logger.warning(
+            "Skipped %d items due to featurization errors. First few: %s",
+            len(skipped),
+            [f"(idx={i}, q={q!r})" for i, q in skipped[:3]],
+        )
 
     # union of all feature keys -> consistent matrix
     all_keys = sorted(set().union(*[f.keys() for f in flat_list])) if flat_list else []
@@ -198,31 +260,135 @@ def save_npz(
 # ---------- CLI ----------
 
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(levelname)s] %(message)s",
+    )
+    logger = logging.getLogger(__name__)
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", type=str, default="data", help="Folder with *.json files (each a list of items)")
     ap.add_argument("--pattern", type=str, default="*.json", help="Glob to match files in data-dir")
     ap.add_argument("--out-prefix", type=str, default="processed/run1", help="Output prefix (no extension)")
-    # optional metric toggles you already support in metric_utils
-    ap.add_argument("--enable-pos-metrics", action="store_true")
-    ap.add_argument("--enable-inference-signal", action="store_true")
     # optional simple include/exclude for features
     ap.add_argument("--allow", nargs="*", default=[], help="Exact feature names to keep")
     ap.add_argument("--deny", nargs="*", default=[], help="Exact feature names to drop")
+    add_extractor_flags(ap)
     args = ap.parse_args()
+    logger.info("Parsed args: %s", vars(args))
 
-    metrics_config = {
-        "enable_pos_metrics": bool(args.enable_pos_metrics),
-        "enable_inference_signal": bool(args.enable_inference_signal),
-    }
+    metrics_config = metrics_config_from_args(args)
+
+    extractor_cfg = getattr(metrics_config, "extractor", None)
+    try:
+        import spacy  # noqa: F401
+        spacy_available = True
+    except Exception:
+        spacy_available = False
+
+    logging.getLogger("extractor").setLevel(logging.WARNING)
+
+    logger.info(
+        "Configuration: use_spacy_fusion=%s, enable_entity_report=%s, spacy_available=%s",
+        getattr(extractor_cfg, "use_spacy_fusion", None),
+        getattr(metrics_config, "enable_entity_report", None),
+        spacy_available,
+    )
+    if extractor_cfg is not None:
+        logger.info(
+        "Extractor enable flags: DATE=%s MONEY=%s NUMBER=%s PERCENT=%s use_spacy_for=%s",
+        extractor_cfg.enable_date,
+        extractor_cfg.enable_money,
+        extractor_cfg.enable_number,
+        extractor_cfg.enable_percent,
+        extractor_cfg.use_spacy_for,
+        )
 
     # 1) Load
     data = load_examples_from_folder(args.data_dir, args.pattern)
     if not data:
         raise SystemExit(f"No examples found in {args.data_dir}/{args.pattern}")
+    logger.info("Loaded %d examples from %s/%s", len(data), args.data_dir, args.pattern)
+
+    extractor_cfg_for_test = getattr(metrics_config, "extractor", None)
+    if extractor_cfg_for_test is not None:
+        for ex in data:
+            if "product launch event" in (ex.get("q", "") or "").lower():
+                try:
+                    import extractor as _extractor_mod
+                    _extract_entities = _extractor_mod.extract_entities
+                    _ensure_spacy = _extractor_mod._ensure_spacy
+                    _extract_spacy = _extractor_mod._extract_spacy
+
+                    ents = _extract_entities(ex.get("a", ""), config=extractor_cfg_for_test)
+                    logger.info(
+                        "Pre-flight extract_entities for question=%r -> %s (spacy_loaded=%s)",
+                        ex.get("q", ""),
+                        [(e.type, e.source) for e in ents],
+                        _extractor_mod._SPACY_NLP is not None,
+                    )
+                    if _extractor_mod._SPACY_NLP is not None:
+                        logger.info(
+                            "spaCy pipeline components: %s",
+                            _extractor_mod._SPACY_NLP.pipe_names,
+                        )
+                    if True:
+                        spacy_only = _extract_spacy(ex.get("a", ""), extractor_cfg_for_test)
+                        logger.info("_extract_spacy direct -> %s", [(e.type, e.source) for e in spacy_only])
+                    if _extractor_mod._SPACY_NLP is None:
+                        ensured = _ensure_spacy()
+                        logger.warning(
+                            "_ensure_spacy() returned: %s (after call loaded=%s)",
+                            ensured,
+                            _extractor_mod._SPACY_NLP is not None,
+                        )
+                        ents_retry = _extract_entities(ex.get("a", ""), config=extractor_cfg_for_test)
+                        logger.warning(
+                            "Retry extract_entities -> %s",
+                            [(e.type, e.source) for e in ents_retry],
+                        )
+                except Exception:
+                    logger.exception("Pre-flight extract_entities failed")
+                break
 
     # 2) Featurize
     feat_cfg = FeatureConfig(allowlist=args.allow, denylist=args.deny)
     X, y, names, meta = featurize_dataset(data, metrics_config=metrics_config, feature_config=feat_cfg)
+
+    def _count(feature_name: str) -> int:
+        if feature_name not in names:
+            return 0
+        col = names.index(feature_name)
+        return int(np.count_nonzero(X[:, col]))
+
+    logger.info(
+        "Non-zero counts: DATE_len=%d, MONEY_len=%d, NUMBER_len=%d",
+        _count("entity_match.DATE__len"),
+        _count("entity_match.MONEY__len"),
+        _count("entity_match.NUMBER__len"),
+    )
+    if "supported_entities.by_type.DATE" in names:
+        logger.info(
+            "Non-zero supported DATE rows=%d",
+            _count("supported_entities.by_type.DATE"),
+        )
+    else:
+        logger.warning("supported_entities.by_type.DATE column missing from feature set")
+
+    # Log a sample row where DATE is present for diagnostics
+    if "entity_match.DATE__len" in names:
+        col = names.index("entity_match.DATE__len")
+        for idx, row in enumerate(X):
+            if row[col] > 0:
+                logger.info(
+                    "Sample DATE row idx=%d question=%r DATE_len=%.3f",
+                    idx,
+                    meta[idx]["q"],
+                    row[col],
+                )
+                break
+        else:
+            logger.warning("No DATE matches found in dataset")
 
     # 3) Save
     out_csv = f"{args.out_prefix}.csv"

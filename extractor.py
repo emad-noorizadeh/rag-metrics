@@ -426,6 +426,20 @@ AMOUNT_CODE_RX = re.compile(
     re.VERBOSE,
 )
 
+# NEW: signed symbol-first (e.g., -$1,200 or +£250)
+SIGNED_SYMBOL_RX = re.compile(
+    r"""
+    (?P<sign>[-+])\s*
+    (?P<sym>[$€£¥])\s*
+    (?P<amt>
+        \(?\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?\)?
+        |
+        \d+(?:\.\d+)?(?:[kKmMbB])?
+    )
+    """,
+    re.VERBOSE,
+)
+
 NUM_SHORTHAND_RX = re.compile(r"\b[-+]?\d+(?:\.\d+)?\s*[kKmMbB]?\b")
 PARENS_NEG_RX = re.compile(r"\((\d[\d,\.]*)\)")
 
@@ -613,7 +627,12 @@ def _extract_money_in_words(text: str) -> List[Entity]:
 # =========================
 # DATE
 # =========================
-def _extract_date(text: str, ref_dt=None, tz="UTC") -> List[Entity]:
+def _extract_date(
+    text: str,
+    ref_dt=None,
+    tz: str = "UTC",
+    allow_relative: bool = True,
+) -> List[Entity]:
     out: List[Entity] = []
     if dateparser is None:
         return out
@@ -658,6 +677,49 @@ def _extract_date(text: str, ref_dt=None, tz="UTC") -> List[Entity]:
         logger.debug("date: fast ISO hits=%r", [(e.text, e.value.iso) for e in iso_hits])
         return iso_hits
 
+    # Early relative-phrase handling (e.g., "next Friday", "last Monday", "tomorrow")
+    if allow_relative:
+        REL_PHRASE_RX = re.compile(
+            r"\b(?:(?P<dir>next|last)\s+(?P<wd>mon|tue(?:s)?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun(?:day)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b"
+            r"|\b(?P<rel>tomorrow|yesterday|today)\b",
+            re.IGNORECASE
+        )
+        rel_m_early = REL_PHRASE_RX.search(text)
+        logger.debug("date: early relative regex matched=%r", rel_m_early.group(0) if rel_m_early else None)
+        if rel_m_early:
+            frag_rel = rel_m_early.group(0)
+            # Try deterministic computation first for next/last WEEKDAY
+            dir_tok = rel_m_early.groupdict().get("dir")
+            wd_tok = rel_m_early.groupdict().get("wd")
+            rel_tok = rel_m_early.groupdict().get("rel")
+            dt_rel = None
+            if dir_tok and wd_tok:
+                dt_rel = _relative_weekday(ref_dt if isinstance(ref_dt, datetime) else None, dir_tok, wd_tok)
+            elif rel_tok:
+                base_dt = ref_dt if isinstance(ref_dt, datetime) else datetime.today()
+                if rel_tok.lower() == "today":
+                    dt_rel = base_dt
+                elif rel_tok.lower() == "tomorrow":
+                    dt_rel = base_dt + timedelta(days=1)
+                elif rel_tok.lower() == "yesterday":
+                    dt_rel = base_dt - timedelta(days=1)
+            # If still None, let dateparser try the fragment with our settings
+            if dt_rel is None:
+                try:
+                    dt_rel = dateparser.parse(_strip_ordinals(frag_rel), settings=settings, languages=["en"])
+                except Exception:
+                    dt_rel = None
+            if dt_rel:
+                iso_rel = dt_rel.isoformat()
+                if not re.search(r"\d{1,2}:\d{2}", frag_rel):
+                    iso_rel = iso_rel.split("T")[0]
+                    res_rel = "date"
+                else:
+                    res_rel = "datetime"
+                out.append(Entity("DATE", frag_rel, rel_m_early.span(), DateValue(iso=iso_rel, resolution=res_rel), "dateparser-relative"))
+                logger.debug("date: relative success %r -> %s", frag_rel, iso_rel)
+                return out
+
     try:
         found = search_dates(text_proc, settings=settings, languages=["en"])
         logger.debug("date: search_dates pass1 found=%r", found)
@@ -670,68 +732,70 @@ def _extract_date(text: str, ref_dt=None, tz="UTC") -> List[Entity]:
 
     if not found:
         logger.debug("date: no matches from search_dates; trying relative phrase fallback")
-        # Regex-capture a relative phrase fragment (e.g., "next Friday", "last Monday", "tomorrow")
-        REL_PHRASE_RX = re.compile(
-            r"\b(?:(?P<dir>next|last)\s+(?P<wd>mon|tue(?:s)?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun(?:day)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b"
-            r"|\b(?P<rel>tomorrow|yesterday|today)\b",
-            re.IGNORECASE
-        )
-        rel_m = REL_PHRASE_RX.search(text)
-        logger.debug("date: relative regex matched=%r", rel_m.group(0) if rel_m else None)
-        if rel_m:
-            frag_rel = rel_m.group(0)
-            try:
-                dt_rel = dateparser.parse(_strip_ordinals(frag_rel), settings=settings, languages=["en"])
-            except Exception:
-                dt_rel = None
-            if dt_rel is None:
+        if allow_relative:
+            # Regex-capture a relative phrase fragment (e.g., "next Friday", "last Monday", "tomorrow")
+            REL_PHRASE_RX = re.compile(
+                r"\b(?:(?P<dir>next|last)\s+(?P<wd>mon|tue(?:s)?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun(?:day)?|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b"
+                r"|\b(?P<rel>tomorrow|yesterday|today)\b",
+                re.IGNORECASE
+            )
+            rel_m = REL_PHRASE_RX.search(text)
+            logger.debug("date: relative regex matched=%r", rel_m.group(0) if rel_m else None)
+            if rel_m:
+                frag_rel = rel_m.group(0)
                 try:
-                    rel_found = search_dates(_strip_ordinals(frag_rel), settings=settings, languages=["en"])
+                    dt_rel = dateparser.parse(_strip_ordinals(frag_rel), settings=settings, languages=["en"])
                 except Exception:
-                    rel_found = None
-                logger.debug("date: relative parse direct=%r | search_dates=%r", dt_rel, rel_found)
-                if rel_found:
-                    _, dt_rel = rel_found[0]
-            # If parser didn't handle it, compute manually for 'next/last WEEKDAY'
-            if dt_rel is None:
-                dir_tok = rel_m.groupdict().get("dir")
-                wd_tok = rel_m.groupdict().get("wd")
-                rel_tok = rel_m.groupdict().get("rel")
-                if dir_tok and wd_tok:
-                    dt_rel = _relative_weekday(ref_dt if isinstance(ref_dt, datetime) else None, dir_tok, wd_tok)
-                elif rel_tok:
-                    # Simple words: today/tomorrow/yesterday
-                    base_dt = ref_dt if isinstance(ref_dt, datetime) else datetime.today()
-                    if rel_tok.lower() == "today":
-                        dt_rel = base_dt
-                    elif rel_tok.lower() == "tomorrow":
-                        dt_rel = base_dt + timedelta(days=1)
-                    elif rel_tok.lower() == "yesterday":
-                        dt_rel = base_dt - timedelta(days=1)
-            if dt_rel:
-                iso_rel = dt_rel.isoformat()
-                if not re.search(r"\d{1,2}:\d{2}", frag_rel):
-                    iso_rel = iso_rel.split("T")[0]
-                    res_rel = "date"
+                    dt_rel = None
+                if dt_rel is None:
+                    try:
+                        rel_found = search_dates(_strip_ordinals(frag_rel), settings=settings, languages=["en"])
+                    except Exception:
+                        rel_found = None
+                    logger.debug("date: relative parse direct=%r | search_dates=%r", dt_rel, rel_found)
+                    if rel_found:
+                        _, dt_rel = rel_found[0]
+                # If parser didn't handle it, compute manually for 'next/last WEEKDAY'
+                if dt_rel is None:
+                    dir_tok = rel_m.groupdict().get("dir")
+                    wd_tok = rel_m.groupdict().get("wd")
+                    rel_tok = rel_m.groupdict().get("rel")
+                    if dir_tok and wd_tok:
+                        dt_rel = _relative_weekday(ref_dt if isinstance(ref_dt, datetime) else None, dir_tok, wd_tok)
+                    elif rel_tok:
+                        # Simple words: today/tomorrow/yesterday
+                        base_dt = ref_dt if isinstance(ref_dt, datetime) else datetime.today()
+                        if rel_tok.lower() == "today":
+                            dt_rel = base_dt
+                        elif rel_tok.lower() == "tomorrow":
+                            dt_rel = base_dt + timedelta(days=1)
+                        elif rel_tok.lower() == "yesterday":
+                            dt_rel = base_dt - timedelta(days=1)
+                if dt_rel:
+                    iso_rel = dt_rel.isoformat()
+                    if not re.search(r"\d{1,2}:\d{2}", frag_rel):
+                        iso_rel = iso_rel.split("T")[0]
+                        res_rel = "date"
+                    else:
+                        res_rel = "datetime"
+                    out.append(Entity("DATE", frag_rel, rel_m.span(), DateValue(iso=iso_rel, resolution=res_rel), "dateparser-relative"))
+                    logger.debug("date: relative success %r -> %s", frag_rel, iso_rel)
+                    return out
+            # Fallback: try parsing the whole string (useful for relative phrases)
+            try:
+                dt_fallback = dateparser.parse(text_proc2, settings=settings, languages=["en"])
+            except Exception:
+                dt_fallback = None
+            if dt_fallback:
+                iso_fb = dt_fallback.isoformat()
+                # Prefer date-only when no explicit time is present
+                if not re.search(r"\d{1,2}:\d{2}", text_proc2):
+                    iso_fb = iso_fb.split("T")[0]
+                    res_fb = "date"
                 else:
-                    res_rel = "datetime"
-                out.append(Entity("DATE", frag_rel, rel_m.span(), DateValue(iso=iso_rel, resolution=res_rel), "dateparser-relative"))
-                logger.debug("date: relative success %r -> %s", frag_rel, iso_rel)
-                return out
-        # Fallback: try parsing the whole string (useful for relative phrases)
-        try:
-            dt_fallback = dateparser.parse(text_proc2, settings=settings, languages=["en"])
-        except Exception:
-            dt_fallback = None
-        if dt_fallback:
-            iso_fb = dt_fallback.isoformat()
-            # Prefer date-only when no explicit time is present
-            if not re.search(r"\d{1,2}:\d{2}", text_proc2):
-                iso_fb = iso_fb.split("T")[0]
-                res_fb = "date"
-            else:
-                res_fb = "datetime"
-            out.append(Entity("DATE", text, (0, len(text)), DateValue(iso=iso_fb, resolution=res_fb), "dateparser-fallback"))
+                    res_fb = "datetime"
+                out.append(Entity("DATE", text, (0, len(text)), DateValue(iso=iso_fb, resolution=res_fb), "dateparser-fallback"))
+            return out
         return out
 
     # Prefer more specific fragments (those that include a day number) and longer spans
@@ -770,6 +834,10 @@ def _extract_date(text: str, ref_dt=None, tz="UTC") -> List[Entity]:
         used_spans.append((start, end))
         last_end = end
 
+        if not allow_relative and not any(ch.isdigit() for ch in frag):
+            # Skip purely relative fragments when fusion is disabled
+            continue
+
         resolution: Literal["date","datetime"] = "datetime" if re.search(r"\d{1,2}:\d{2}", frag) else "date"
         iso = dt.isoformat()
         if resolution == "date":
@@ -788,6 +856,29 @@ def _extract_money(text: str) -> List[Entity]:
 
     # 0) Money expressed in words (fallback for spaCy and natural language)
     out.extend(_extract_money_in_words(text))
+
+    # 0.5) NEW: signed symbol-first (e.g., -$1,200)
+    for m in SIGNED_SYMBOL_RX.finditer(text):
+        sign = -1.0 if (m.group("sign") == "-") else 1.0
+        sym = m.group("sym")
+        amt_s = m.group("amt") or ""
+        # handle parentheses negatives inside amount, and k/m/b suffix
+        neg_paren = amt_s.startswith("(") and amt_s.endswith(")")
+        core = amt_s.strip("()").replace(",", "").replace(" ", "")
+        mult = 1.0
+        if core.lower().endswith("k"): core, mult = core[:-1], 1e3
+        elif core.lower().endswith("m"): core, mult = core[:-1], 1e6
+        elif core.lower().endswith("b"): core, mult = core[:-1], 1e9
+        try:
+            val = float(core) * mult
+            if neg_paren:
+                val = -val
+            val *= sign
+        except Exception:
+            continue
+        cur3 = _CURRENCY_MAP.get(sym)
+        span = (m.start(), m.end())
+        out.append(Entity("MONEY", text[span[0]:span[1]], span, MoneyValue(amount=val, currency=cur3), "money-signed-symbol"))
 
     # 1) NEW: explicit "CUR 3.5k" form
     for m in CODE_AMOUNT_RX.finditer(text):
@@ -1247,6 +1338,7 @@ def _extract_spacy(text: str, cfg: ExtractorConfig, ref_dt=None) -> List[Entity]
     if nlp is None:
         return []
     doc = nlp(text)
+    logger.debug("spacy raw ents: %s", [(ent.text, ent.label_) for ent in getattr(doc, "ents", [])])
     out: List[Entity] = []
     for ent in getattr(doc, "ents", []):
         label = ent.label_.upper()
@@ -1297,6 +1389,8 @@ def _extract_spacy(text: str, cfg: ExtractorConfig, ref_dt=None) -> List[Entity]
                         iso = iso.split("T")[0]
                     logger.debug("spacy date: frag=%r -> %s (res=%s)", frag2, iso, res)
                     out.append(Entity("DATE", text[span[0]:span[1]], span, DateValue(iso=iso, resolution=res), "spacy"))
+                else:
+                    logger.debug("spacy date parse failed for frag=%r settings=%s", frag2, settings)
 
         elif label == "QUANTITY" and want("QUANTITY"):
             tmpq = _extract_quantity(frag)
@@ -1336,7 +1430,12 @@ def extract_entities(
     if config.enable_money:
         det_entities += _extract_money(text)
     if config.enable_date:
-        det_entities += _extract_date(text, ref_dt=ref_date, tz=config.timezone)
+        det_entities += _extract_date(
+            text,
+            ref_dt=ref_date,
+            tz=config.timezone,
+            allow_relative=config.use_spacy_fusion,
+        )
     if config.enable_quantity:
         det_entities += _extract_quantity(text)
     if config.enable_phone:
@@ -1346,6 +1445,10 @@ def extract_entities(
         # drop numbers/percents that are entirely inside an existing entity span
         taken = [e.span for e in det_entities]
         for e in nums:
+            if e.type == "NUMBER" and not config.enable_number:
+                continue
+            if e.type == "PERCENT" and not config.enable_percent:
+                continue
             if not _inside_any(e.span[0], e.span[1], taken):
                 det_entities.append(e)
 
