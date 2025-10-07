@@ -161,6 +161,7 @@ stratified k-fold cross-validation:
 /Users/emadn/Projects/pipven/bin/python eval_kfold.py \
   --train-npz data/processed/train_v3.npz \
   --test-npz  data/processed/test_v3.npz \
+  --test-csv  data/processed/test_v3.csv \
   --Cs 0.1,0.3,1,3,10 --n-splits 5 --objective f1 \
   --min-precision 0.90 --standardize --max-iter 2000 \
   --solver lbfgs --penalty l2 --class-weight balanced \
@@ -170,6 +171,9 @@ stratified k-fold cross-validation:
   --featurization-meta artifacts/featurization_meta.json \
   --tag "v1.0-trainset_v3"
 ```
+
+Passing `--test-csv` in tandem with `--test-npz` lets the script join the
+`answer_type` column from the CSV and print a per-category breakdown.
 
 Outputs:
 
@@ -291,6 +295,8 @@ formatted as shown above; it calls the report directly without flattening.
   runs, lower the log level or remove the sentinel debug block.
 * Tests under `tests/` cover extractor edge cases (`test_entities_hardcases`),
   flag plumbing (`test_data_processing_flags`), and end-to-end metrics sanity.
+* Run `scripts/analyze_features.py --npz ... --model ...` to inspect feature
+  correlations, zero-variance columns, and coefficient rankings after training.
 
 ---
 

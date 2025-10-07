@@ -27,7 +27,7 @@ Notes
 
 # --use-embed-alignment: recorded in artifacts (for reproducibility); features must already include embed metrics from data_processing.
 """
-import argparse, json, math
+import argparse, json, math, csv
 from dataclasses import dataclass
 from typing import Dict, Tuple, List, Optional
 
@@ -204,6 +204,7 @@ def train_final_and_eval(
     bestC: float,
     final_threshold: float,
     test_npz: Optional[str] = None,
+    test_csv: Optional[str] = None,
     save_model: Optional[str] = None,
     save_report: Optional[str] = None,
     args: Optional[argparse.Namespace] = None,
@@ -243,6 +244,35 @@ def train_final_and_eval(
             precision=float(precision_score(yt, yhat, zero_division=0)),
             recall=float(recall_score(yt, yhat, zero_division=0)),
         )
+        if test_csv:
+            try:
+                answer_types: List[str] = []
+                with open(test_csv, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        val = row.get("answer_type")
+                        answer_types.append(val.strip() if val else "unknown")
+                if len(answer_types) == len(yt):
+                    per_cat = {}
+                    for cat in sorted(set(answer_types)):
+                        idxs = [i for i, c in enumerate(answer_types) if c == cat]
+                        yi = yt[idxs]
+                        ypi = yprob[idxs]
+                        yhi = yhat[idxs]
+                        per_cat[cat] = dict(
+                            support=len(idxs),
+                            precision=float(precision_score(yi, yhi, zero_division=0)),
+                            recall=float(recall_score(yi, yhi, zero_division=0)),
+                            f1=float(f1_score(yi, yhi, zero_division=0)),
+                            pr_auc=float(average_precision_score(yi, ypi)) if len(set(yi)) > 1 else None,
+                        )
+                    report["test"]["by_answer_type"] = per_cat
+                else:
+                    report["test"]["by_answer_type_warning"] = (
+                        f"Row count mismatch: csv={len(answer_types)} npz={len(yt)}; skipping breakdown"
+                    )
+            except Exception as exc:
+                report["test"]["by_answer_type_warning"] = f"Failed to compute breakdown: {exc}"
 
     if save_model:
         os.makedirs(os.path.dirname(save_model) or ".", exist_ok=True)
@@ -305,6 +335,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--train-npz", required=True, help="Processed features: np.savez(..., X, y, feature_names)")
     ap.add_argument("--test-npz", default=None, help="Optional held-out test NPZ for final check")
+    ap.add_argument("--test-csv", default=None, help="Optional CSV aligned with --test-npz (used for metadata breakdown)")
     ap.add_argument("--Cs", default="0.1,0.3,1,3,10", help="Comma-separated Cs to try")
     ap.add_argument("--n-splits", type=int, default=5)
     ap.add_argument("--seed", type=int, default=42)
@@ -368,6 +399,7 @@ def main():
         X, y, feature_names,
         bestCres.C, bestCres.mean_threshold,
         test_npz=args.test_npz,
+        test_csv=args.test_csv,
         save_model=args.save_model,
         save_report=args.save_report,
         args=args,
@@ -381,6 +413,22 @@ def main():
         print("\nTEST:")
         print(f"  F1={t['f1']:.3f}  PR-AUC={t['pr_auc']:.3f}  ROC-AUC={t['roc_auc']:.3f}  "
               f"Prec={t['precision']:.3f}  Rec={t['recall']:.3f}")
+        by_cat = t.get("by_answer_type")
+        if isinstance(by_cat, dict):
+            print("  Breakdown by answer_type:")
+            for cat, metrics in sorted(by_cat.items()):
+                support = metrics.get("support", 0)
+                prec = metrics.get("precision")
+                rec = metrics.get("recall")
+                f1 = metrics.get("f1")
+                def _fmt(v):
+                    return f"{v:.3f}" if isinstance(v, (int, float)) else "n/a"
+                print(
+                    f"    {cat or 'unknown'}: support={support}  precision={_fmt(prec)}  "
+                    f"recall={_fmt(rec)}  f1={_fmt(f1)}"
+                )
+        elif "by_answer_type_warning" in t:
+            print(f"  [warn] {t['by_answer_type_warning']}")
 
     # Show top coefficients if feature names available
     if feature_names is not None:
