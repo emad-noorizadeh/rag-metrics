@@ -29,6 +29,7 @@ Author: Emad Noorizadeh
 """
 
 import re
+import warnings
 from typing import List, Dict, Any, Tuple, Optional
 from collections import Counter
 from math import log, sqrt
@@ -54,6 +55,12 @@ from extractor import (
     is_money, is_number, is_percent, is_date, is_quantity, is_phone,
     money_equal, number_equal, date_equal, entity_coverage,
     canonicalize_date, match_entity_values,   # <-- ensure this is included
+)
+
+warnings.filterwarnings(
+    "ignore",
+    message=".*split_arg_string is deprecated.*",
+    category=DeprecationWarning,
 )
 
 # -------------------------

@@ -1,6 +1,7 @@
 # data_processing.py
 from __future__ import annotations
 import os, glob, json, csv, argparse
+import warnings
 from typing import Any, Dict, List, Iterable, Tuple, Optional
 from dataclasses import dataclass, field
 import numpy as np
@@ -10,6 +11,13 @@ import logging
 
 from metric_utils import context_utilization_report_with_entities
 from shared_config import add_extractor_flags, metrics_config_from_args
+
+# Silence plac/optparse deprecation noise triggered by spaCy CLI helpers under Python 3.10+
+warnings.filterwarnings(
+    "ignore",
+    message=".*split_arg_string is deprecated.*",
+    category=DeprecationWarning,
+)
 
 # ---------- small helpers ----------
 

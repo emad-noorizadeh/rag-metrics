@@ -1,5 +1,14 @@
 """Minimal spaCy smoke test."""
 
+import warnings
+
+
+warnings.filterwarnings(
+    "ignore",
+    message=".*split_arg_string is deprecated.*",
+    category=DeprecationWarning,
+)
+
 
 def test_spacy_smoke():
     import spacy
