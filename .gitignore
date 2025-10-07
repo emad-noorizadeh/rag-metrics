@@ -10,3 +10,6 @@ pipven/
 .env
 *.log
 
+# Local data/model artifacts
+data/
+artifacts/
