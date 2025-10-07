@@ -233,7 +233,10 @@ def featurize_dataset(
 
     logger = logging.getLogger(__name__)
     skipped: List[Tuple[int, str]] = []
+    total = len(data)
     for idx, ex in enumerate(data):
+        if total and idx % max(1, total // 20) == 0:
+            logger.info("Featurising row %d / %d", idx + 1, total)
         try:
             flat, y, _rep = featurize_item(ex, metrics_config=metrics_config)
         except Exception:
