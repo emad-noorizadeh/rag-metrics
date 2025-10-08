@@ -8,6 +8,7 @@ dateparser>=1.2
 sentence-transformers>=2.2
 spacy>=3.7,<3.9
 matplotlib>=3.7
+seaborn>=0.13
 
 # Optional extractors (gracefully degrade if missing)
 price-parser>=0.4

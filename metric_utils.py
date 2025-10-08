@@ -609,7 +609,8 @@ def _embed_context_alignment(answer: str, contexts: List[str],
     best_similarity = max(similarities) if similarities else 0.0
     return {
         "answer_context_similarity": round(avg_similarity, 4),
-        "best_context_similarity": round(best_similarity, 4)
+        "best_context_similarity": round(best_similarity, 4),
+        "context_similarities": similarities,
     }
 
 # -------------------------
@@ -1104,6 +1105,23 @@ def context_utilization_report_with_entities(
     nump = round(numeric_match * 100, 1)
     entp = round((entity_match["overall"] if entity_match["overall"] is not None else 0.0) * 100, 1)
     parts = [f"{pct}% grounded", f"{rec}% best-context recall", f"{nump}% numeric", f"{entp}% entity"]
+    context_sim_list = context_align.get("context_similarities") or []
+    best_context_sim = context_align.get("best_context_similarity")
+    semantic_gap = None
+    if context_sim_list and best_context_sim is not None:
+        best_index = max(range(len(context_sim_list)), key=lambda i: context_sim_list[i])
+        best_len = len(_tokens(retrieved_contexts[best_index] if retrieved_contexts and best_index < len(retrieved_contexts) else ""))
+        semantic_gap = round((context_align["answer_context_similarity"] or 0.0) * (prec / max(1, best_len)), 4)
+
+    per_sentence_similarity = None
+    if per_sentence and best_context_sim is not None:
+        per_sentence_similarity = round(best_context_sim / max(1, len(per_sentence)), 4)
+
+    qa_embed_similarity = embed_align.get("cosine_embed") if embed_align else None
+    novelty_ratio = None
+    if qa_embed_similarity is not None and qa_embed_similarity > 0:
+        novelty_ratio = round(prec / qa_embed_similarity, 4)
+
     if use_embed_alignment and embed_align["cosine_embed"] is not None:
         parts.append(f"Q↔A embed {round(embed_align['cosine_embed'], 2)}")
         if context_align["answer_context_similarity"] is not None:
@@ -1131,6 +1149,9 @@ def context_utilization_report_with_entities(
             "answer_context_similarity": context_align["answer_context_similarity"],
             "best_context_similarity": context_align["best_context_similarity"],
         },
+        "semantic_gap": semantic_gap,
+        "per_sentence_semantic_alignment": per_sentence_similarity,
+        "answer_novelty_ratio": novelty_ratio,
         "unsupported_terms": unsupported,
         "unsupported_terms_per_sentence": unsupported_ps,
         "unsupported_numbers": unsupported_nums,
