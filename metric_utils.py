@@ -741,6 +741,45 @@ def _inference_signal(rep: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _inference_signal_sem(rep: Dict[str, Any]) -> Dict[str, Any]:
+    """Embedding-aware inference heuristic.
+
+    score = (1 - entity_match.overall) * (precision_token / cosine_embed)
+    (clamped to [0, 1]). Higher means answer likely inferred despite semantic alignment.
+    """
+    prec = rep.get("precision_token")
+    ent_overall = (rep.get("entity_match", {}) or {}).get("overall")
+    qa_embed = (rep.get("qr_alignment", {}) or {}).get("cosine_embed")
+
+    try:
+        prec = float(prec)
+    except (TypeError, ValueError):
+        return {"inference_sem_likely": None, "inference_sem_score": None}
+
+    try:
+        ent_overall = float(ent_overall)
+    except (TypeError, ValueError):
+        return {"inference_sem_likely": None, "inference_sem_score": None}
+
+    try:
+        qa_embed = float(qa_embed)
+    except (TypeError, ValueError):
+        return {"inference_sem_likely": None, "inference_sem_score": None}
+
+    if qa_embed <= 1e-6:
+        return {"inference_sem_likely": None, "inference_sem_score": None}
+
+    prec = max(0.0, min(1.0, prec))
+    ent_overall = max(0.0, min(1.0, ent_overall))
+    ratio = min(1.0, prec / qa_embed)
+    score = max(0.0, min(1.0, (1.0 - ent_overall) * ratio))
+
+    return {
+        "inference_sem_likely": bool(score >= 0.5),
+        "inference_sem_score": round(score, 4),
+    }
+
+
 # -------------------------
 # Main advanced function
 # -------------------------
@@ -1039,6 +1078,15 @@ def context_utilization_report_with_entities(
     else:
         infer = {"inference_likely": None, "inference_score": None, "inference_explanation": None}
 
+    infer_sem = _inference_signal_sem({
+        "precision_token": precision_token,
+        "entity_match": entity_match,
+        "qr_alignment": {"cosine_embed": embed_align.get("cosine_embed")},
+    }) if _is_enabled(metrics_config, "enable_inference_signal", True) else {
+        "inference_sem_likely": None,
+        "inference_sem_score": None,
+    }
+
     # ---- Summary
     pct = round(precision_token * 100, 1)
     rec = round(recall_context * 100, 1)
@@ -1083,6 +1131,8 @@ def context_utilization_report_with_entities(
         # Inference detector
         "inference_likely": infer.get("inference_likely"),
         "inference_score": infer.get("inference_score"),
+        "inference_sem_likely": infer_sem.get("inference_sem_likely"),
+        "inference_sem_score": infer_sem.get("inference_sem_score"),
         "inference_explanation": infer.get("inference_explanation"),
         "summary": summary,
         **quickwin,

@@ -184,7 +184,7 @@ def featurize_item(
         rep,
         include_list_lengths=True,
         include_numeric_list_stats=True,
-        include_boolean_allowlist=("inference_likely",),
+        include_boolean_allowlist=("inference_likely", "inference_sem_likely"),
     )
     enable_entity_report = True
     if metrics_config is not None:
