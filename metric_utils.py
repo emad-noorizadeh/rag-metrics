@@ -1110,8 +1110,11 @@ def context_utilization_report_with_entities(
     semantic_gap = None
     if context_sim_list and best_context_sim is not None:
         best_index = max(range(len(context_sim_list)), key=lambda i: context_sim_list[i])
-        best_len = len(_tokens(retrieved_contexts[best_index] if retrieved_contexts and best_index < len(retrieved_contexts) else ""))
-        semantic_gap = round((context_align["answer_context_similarity"] or 0.0) * (prec / max(1, best_len)), 4)
+        best_ctx_text = ""
+        if retrieved_contexts and 0 <= best_index < len(retrieved_contexts):
+            best_ctx_text = retrieved_contexts[best_index] or ""
+        best_len = len(_informative_terms(_tokens(best_ctx_text)))
+        semantic_gap = round((context_align["answer_context_similarity"] or 0.0) * (precision_token / max(1, best_len)), 4)
 
     per_sentence_similarity = None
     if per_sentence and best_context_sim is not None:
@@ -1120,7 +1123,7 @@ def context_utilization_report_with_entities(
     qa_embed_similarity = embed_align.get("cosine_embed") if embed_align else None
     novelty_ratio = None
     if qa_embed_similarity is not None and qa_embed_similarity > 0:
-        novelty_ratio = round(prec / qa_embed_similarity, 4)
+        novelty_ratio = round(precision_token / qa_embed_similarity, 4)
 
     if use_embed_alignment and embed_align["cosine_embed"] is not None:
         parts.append(f"Q↔A embed {round(embed_align['cosine_embed'], 2)}")
