@@ -310,11 +310,23 @@ python scripts/analyze_predictions.py \
 Outputs a JSON report (and prints it to stdout) covering:
 
 - Counts by outcome (TP/FP/FN/TN) and by `answer_type`.
-- For false positives and false negatives, aggregates of the features that most
-  frequently contributed to the mistake, with separate tallies for positive vs
-  negative contributions.
+- Feature-level contribution stats per outcome plus global sign counts
+  (coefficient/sign-style view of which signals push the model up or down).
+- Group summaries by feature prefix (e.g., `entity_match.*`, `qr_alignment.*`)
+  for quick semantic confusion matrices.
+- A TP vs FN impact matrix highlighting features that consistently help true
+  positives while avoiding false negatives, alongside a ranking CSV sorted by
+  `(norm_tp - norm_fn)`.
 - Optional `--top-n` lets you change how many features per row are considered
   (defaults to 10 to match the exporter).
+
+Artifacts written next to the JSON (or in the working directory if you omit
+`--out-json`):
+
+- `impact_matrix_TPFN.csv` – average and normalised TP/FN contributions with a
+  combined score per feature.
+- `impact_ranking_TPFN.csv` – features sorted by TP minus FN impact, useful for
+  heatmaps or prioritising feature tuning.
 
 ## Runtime Inference
 
