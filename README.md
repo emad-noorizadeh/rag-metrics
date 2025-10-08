@@ -229,6 +229,46 @@ Lists (e.g., unsupported term details) are flattened with suffixes like
 can extend `metrics_config` in `shared_config.py` or pass overrides like
 `--prefer-deterministic`/`--enable-types` to control the extractor.
 
+### Feature diagnostics (`analyze_features.py`)
+
+Use `scripts/analyze_features.py` to inspect the featurized dataset and spot
+redundant columns, zero-variance signals, or dominant logistic coefficients.
+
+Example:
+
+```
+python scripts/analyze_features.py \
+  --npz data/processed/train_v1.npz \
+  --model artifacts/lr_model_v1.pkl \
+  --out artifacts/feature_report_v1.json
+```
+
+Parameters:
+
+- `--npz` (required): path to the NPZ produced by `data_processing.py`. It must
+  include `X`, `y`, and `feature_names` arrays.
+- `--model` (optional): pickled artifact from `eval_kfold.py`; when supplied the
+  script extracts logistic-regression coefficients via `_extract_lr`.
+- `--out` (optional): JSON path to persist the diagnostics (same content that is
+  printed to stdout).
+- `--corr-threshold` (optional, default 0.9): minimum absolute Pearson
+  correlation when flagging highly correlated feature pairs.
+
+What you get:
+
+- List of zero-variance columns (`zero_variance_features`).
+- Top feature correlations with the label (`top_corr_with_y`).
+- Highly correlated feature pairs (`high_correlation_pairs`) to guide deny
+  lists.
+- Top positive / negative logistic coefficients (`top_positive_coefficients`,
+  `top_negative_coefficients`) when a model is provided.
+- Optional JSON report suitable for checking into `artifacts/` alongside other
+  diagnostics.
+
+Tip: feed the flagged features into `DENY_FEATURES` in `create_dataset.sh` or
+pass them to `eval_kfold.py --deny` so training and inference stay aligned after
+pruning.
+
 Recent run highlights (train_v3/test_v3):
 
 | Metric | CV (C=3.0) | Test |
