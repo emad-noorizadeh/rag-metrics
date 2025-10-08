@@ -126,8 +126,8 @@ Features are grouped naturally by their prefix:
 * **Entity Metrics** –
   * Per-type counts: `entity_match.<TYPE>__len`.
   * Presence flags: `entity_match.presence_by_type.<TYPE>` (1 if answer mentions).
-  * Match state: `entity_match.state_by_type.<TYPE>` (1 fully grounded, 0 partial,
-    -1 absent in answer).
+  * All-matched flag: `entity_match.state_by_type.<TYPE>` (1 if every answer
+    entity of that type is grounded, otherwise 0).
   * Aggregates: `entity_match.overall`, `entity_match.unsupported__len`.
   * Supported spans: `supported_entities.by_type.<TYPE>`, `supported_entities.count`.
 * **Numeric Alignment** – `numeric_match`, `unsupported_numbers__len`,
@@ -296,6 +296,25 @@ The script:
 - Stacks the rows, writes a merged NPZ (with aligned feature names), and emits a
   lightweight CSV preview for quick auditing.
 - Fails fast if there is no overlap or if an input is missing required arrays.
+
+### `scripts/analyze_predictions.py`
+
+Summarises the per-row prediction CSV exported by `eval_kfold.py --save-predictions`.
+
+```
+python scripts/analyze_predictions.py \
+  --predictions artifacts/predictions_v1.csv \
+  --out-json artifacts/predictions_analysis.json
+```
+
+Outputs a JSON report (and prints it to stdout) covering:
+
+- Counts by outcome (TP/FP/FN/TN) and by `answer_type`.
+- For false positives and false negatives, aggregates of the features that most
+  frequently contributed to the mistake, with separate tallies for positive vs
+  negative contributions.
+- Optional `--top-n` lets you change how many features per row are considered
+  (defaults to 10 to match the exporter).
 
 ## Runtime Inference
 

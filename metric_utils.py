@@ -483,14 +483,18 @@ def _entity_alignment(answer: str, contexts: List[str], config: ExtractorConfig 
     all_types: List[EntityType] = ["MONEY","NUMBER","PERCENT","DATE","QUANTITY","PHONE"]
     presence_by_type = {t: int(total_by_type.get(t, 0) > 0) for t in all_types}
     state_by_type: Dict[str, float] = {}
+    all_matched_by_type: Dict[str, int] = {}
     for t in all_types:
         tot = total_by_type.get(t, 0)
         if tot == 0:
-            state = -1.0
+            state = 0.0
+            all_matched = 0
         else:
-            rate = covered_by_type.get(t, 0) / tot
-            state = 1.0 if rate == 1.0 else 0.0
+            fully_covered = covered_by_type.get(t, 0) == tot
+            state = 1.0 if fully_covered else 0.0
+            all_matched = 1 if fully_covered else 0
         state_by_type[t] = state
+        all_matched_by_type[t] = all_matched
     return {
         "match": {
             "overall": round(overall, 4),
@@ -498,6 +502,7 @@ def _entity_alignment(answer: str, contexts: List[str], config: ExtractorConfig 
             "unsupported": unsupported,
             "presence_by_type": presence_by_type,
             "state_by_type": state_by_type,
+            "all_matched_by_type": all_matched_by_type,
         },
         "supported_entities": {
             "items": supported_items,
