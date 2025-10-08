@@ -272,18 +272,18 @@ def save_heatmap(matrix: Dict[str, Dict[str, float]],
     tp_values = [matrix[name]["norm_tp"] for name in top_features]
     fn_values = [matrix[name]["norm_fn"] for name in top_features]
 
-    data = [tp_values, fn_values]
-    fig, ax = plt.subplots(figsize=(max(6, len(top_features) * 0.4), 3))
-    im = ax.imshow(data, aspect="auto", cmap="coolwarm", vmin=-1, vmax=1)
-    ax.set_yticks([0, 1])
-    ax.set_yticklabels(["TP (norm)", "FN (norm)"])
-    ax.set_xticks(range(len(top_features)))
+    x = range(len(top_features))
+    width = 0.35
+    fig_width = max(10, len(top_features) * 0.7)
+    fig, ax = plt.subplots(figsize=(fig_width, 5.0))
+    ax.bar([i - width / 2 for i in x], tp_values, width=width, label="TP (norm)", color="#2b8cbe")
+    ax.bar([i + width / 2 for i in x], [-v for v in fn_values], width=width, label="FN (norm, inverted)", color="#de2d26")
+    ax.axhline(0.0, color="black", linewidth=0.8)
+    ax.set_xticks(list(x))
     ax.set_xticklabels(top_features, rotation=45, ha="right")
+    ax.set_ylabel("Normalised contribution")
     ax.set_title("TP vs FN Normalised Impact (Top Features)")
-
-    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Normalised contribution")
-
+    ax.legend(loc="upper right")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)

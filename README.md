@@ -329,8 +329,9 @@ Artifacts written next to the JSON (or in the working directory if you omit
   combined score per feature.
 - `impact_ranking_TPFN.csv` – features sorted by TP minus FN impact, useful for
   heatmaps or prioritising feature tuning.
-- `impact_heatmap_TPFN.png` – visual heatmap of the top `--heatmap-top-k`
-  features using the normalised TP ([-1, 1]) and FN ([0, 1]) scores.
+- `impact_heatmap_TPFN.png` – bar chart for the top `--heatmap-top-k` features
+  comparing normalised TP support (blue, positive) against inverted FN pressure
+  (red, plotted below zero).
 
 Impact matrix details:
 
@@ -342,7 +343,8 @@ Impact matrix details:
 - `norm_fn = |avg_fn| / max(|avg_fn|)` highlights how often the feature hurts
   recall; closer to 1 indicates stronger negative pressure in FNs.
 - `score = norm_tp - norm_fn` drives the ranking CSV and heatmap ordering: high
-  scores indicate features that help TP while staying quiet in FN rows.
+  scores indicate features that help TP while staying quiet in FN rows. (In the
+  heatmap, we plot `-norm_fn` so FN-heavy features appear below the centreline.)
 
 ## Runtime Inference
 
