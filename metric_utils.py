@@ -744,11 +744,14 @@ def _inference_signal(rep: Dict[str, Any]) -> Dict[str, Any]:
 def _inference_signal_sem(rep: Dict[str, Any]) -> Dict[str, Any]:
     """Embedding-aware inference heuristic.
 
-    score = (1 - entity_match.overall) * (precision_token / cosine_embed)
-    (clamped to [0, 1]). Higher means answer likely inferred despite semantic alignment.
+    score = typed_gap * min(1, precision_token / cosine_embed)
+    where typed_gap defaults to 1 when the answer has no entities (so purely
+    textual inference can still be flagged).
     """
     prec = rep.get("precision_token")
-    ent_overall = (rep.get("entity_match", {}) or {}).get("overall")
+    entity_info = (rep.get("entity_match", {}) or {})
+    ent_overall = entity_info.get("overall")
+    presence_map = entity_info.get("presence_by_type", {}) or {}
     qa_embed = (rep.get("qr_alignment", {}) or {}).get("cosine_embed")
 
     try:
@@ -759,7 +762,7 @@ def _inference_signal_sem(rep: Dict[str, Any]) -> Dict[str, Any]:
     try:
         ent_overall = float(ent_overall)
     except (TypeError, ValueError):
-        return {"inference_sem_likely": None, "inference_sem_score": None}
+        ent_overall = None
 
     try:
         qa_embed = float(qa_embed)
@@ -770,9 +773,17 @@ def _inference_signal_sem(rep: Dict[str, Any]) -> Dict[str, Any]:
         return {"inference_sem_likely": None, "inference_sem_score": None}
 
     prec = max(0.0, min(1.0, prec))
-    ent_overall = max(0.0, min(1.0, ent_overall))
+    has_entities = any(bool(v) for v in presence_map.values())
+    if ent_overall is not None:
+        ent_overall = max(0.0, min(1.0, ent_overall))
+
+    if not has_entities or ent_overall is None:
+        typed_gap = 1.0
+    else:
+        typed_gap = max(0.0, min(1.0, 1.0 - ent_overall))
+
     ratio = min(1.0, prec / qa_embed)
-    score = max(0.0, min(1.0, (1.0 - ent_overall) * ratio))
+    score = max(0.0, min(1.0, typed_gap * ratio))
 
     return {
         "inference_sem_likely": bool(score >= 0.5),
