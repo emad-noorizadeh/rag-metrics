@@ -23,6 +23,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 ALLOWED_ANSWER_TYPES = {"list", "fact", "abstain", "numeric", "inference", "comparison"}
 
 
@@ -92,6 +96,8 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--out-json", default=None, help="Optional JSON report path")
     ap.add_argument("--top-n", type=int, default=10,
                     help="How many feature contributions per row (default aligns with exporter)")
+    ap.add_argument("--heatmap-top-k", type=int, default=20,
+                    help="Number of top-ranked features to include in the heatmap (default 20)")
     return ap.parse_args()
 
 
@@ -254,6 +260,35 @@ def compute_impact_matrix(
     return matrix, rankings
 
 
+def save_heatmap(matrix: Dict[str, Dict[str, float]],
+                 ranking: List[Tuple[str, float]],
+                 top_k: int,
+                 path: Path) -> None:
+    if not matrix or not ranking:
+        return
+    top_features = [name for name, _ in ranking[:top_k]]
+    if not top_features:
+        return
+    tp_values = [matrix[name]["norm_tp"] for name in top_features]
+    fn_values = [matrix[name]["norm_fn"] for name in top_features]
+
+    data = [tp_values, fn_values]
+    fig, ax = plt.subplots(figsize=(max(6, len(top_features) * 0.4), 3))
+    im = ax.imshow(data, aspect="auto", cmap="coolwarm", vmin=-1, vmax=1)
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(["TP (norm)", "FN (norm)"])
+    ax.set_xticks(range(len(top_features)))
+    ax.set_xticklabels(top_features, rotation=45, ha="right")
+    ax.set_title("TP vs FN Normalised Impact (Top Features)")
+
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("Normalised contribution")
+
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     args = parse_args()
     predictions = load_predictions(args.predictions)
@@ -265,6 +300,7 @@ def main() -> None:
     print(json.dumps(summary, indent=2))
 
     out_json = args.out_json
+    heatmap_top_k = max(1, args.heatmap_top_k)
     if out_json:
         Path(out_json).parent.mkdir(parents=True, exist_ok=True)
         with open(out_json, "w", encoding="utf-8") as f:
@@ -286,19 +322,17 @@ def main() -> None:
 
         ranking_path = (Path(out_json).with_name("impact_ranking_TPFN.csv")
                         if out_json else Path("impact_ranking_TPFN.csv"))
-        with open(ranking_path, "w", encoding="utf-8") as f:
-            f.write("feature,score\n")
-            for feature, score in impact_ranking:
-                f.write(f"{feature},{score:.4f}\n")
-        print(f"Saved TP/FN impact ranking → {ranking_path}")
-    ranking_path = (Path(out_json).with_name("impact_ranking_TPFN.csv")
-                    if out_json else Path("impact_ranking_TPFN.csv"))
-    if impact_ranking:
-        with open(ranking_path, "w", encoding="utf-8") as f:
-            f.write("feature,score\n")
-            for feature, score in impact_ranking:
-                f.write(f"{feature},{score:.4f}\n")
-        print(f"Saved TP/FN impact ranking → {ranking_path}")
+        if impact_ranking:
+            with open(ranking_path, "w", encoding="utf-8") as f:
+                f.write("feature,score\n")
+                for feature, score in impact_ranking:
+                    f.write(f"{feature},{score:.4f}\n")
+            print(f"Saved TP/FN impact ranking → {ranking_path}")
+
+        heatmap_path = (Path(out_json).with_name("impact_heatmap_TPFN.png")
+                        if out_json else Path("impact_heatmap_TPFN.png"))
+        save_heatmap(impact_matrix, impact_ranking, heatmap_top_k, heatmap_path)
+        print(f"Saved TP/FN impact heatmap → {heatmap_path}")
 
 
 if __name__ == "__main__":

@@ -319,6 +319,8 @@ Outputs a JSON report (and prints it to stdout) covering:
   `(norm_tp - norm_fn)`.
 - Optional `--top-n` lets you change how many features per row are considered
   (defaults to 10 to match the exporter).
+- Optional `--heatmap-top-k` picks how many ranked features feed the heatmap
+  (default 20).
 
 Artifacts written next to the JSON (or in the working directory if you omit
 `--out-json`):
@@ -327,6 +329,20 @@ Artifacts written next to the JSON (or in the working directory if you omit
   combined score per feature.
 - `impact_ranking_TPFN.csv` – features sorted by TP minus FN impact, useful for
   heatmaps or prioritising feature tuning.
+- `impact_heatmap_TPFN.png` – visual heatmap of the top `--heatmap-top-k`
+  features using the normalised TP ([-1, 1]) and FN ([0, 1]) scores.
+
+Impact matrix details:
+
+- `avg_tp` – mean per-row contribution of a feature across TP predictions.
+- `avg_fn` – mean per-row contribution across FN predictions (signed, but we
+  penalise magnitude when normalising).
+- `norm_tp = avg_tp / max(|avg_tp|)` provides a -1…1 score showing how strongly
+  the feature supports true positives relative to the best-performing feature.
+- `norm_fn = |avg_fn| / max(|avg_fn|)` highlights how often the feature hurts
+  recall; closer to 1 indicates stronger negative pressure in FNs.
+- `score = norm_tp - norm_fn` drives the ranking CSV and heatmap ordering: high
+  scores indicate features that help TP while staying quiet in FN rows.
 
 ## Runtime Inference
 
