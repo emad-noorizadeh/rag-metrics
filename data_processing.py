@@ -281,6 +281,22 @@ def featurize_dataset(
                 X[i, j] = f[k]
 
     y = np.array(y_list, dtype=int)
+
+    # Drop zero-variance columns
+    if X.size:
+        col_min = X.min(axis=0)
+        col_max = X.max(axis=0)
+        keep = (col_max - col_min) > 1e-12
+        removed = [all_keys[i] for i, flag in enumerate(keep) if not flag]
+        if removed:
+            logging.getLogger(__name__).info(
+                "Dropping %d zero-variance features: %s",
+                len(removed),
+                ", ".join(removed),
+            )
+            X = X[:, keep]
+            all_keys = [all_keys[i] for i, flag in enumerate(keep) if flag]
+
     return X, y, all_keys, meta
 
 # ---------- Save ----------

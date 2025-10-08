@@ -29,7 +29,7 @@ Notes
 """
 import argparse, json, math, csv
 from dataclasses import dataclass
-from typing import Dict, Tuple, List, Optional
+from typing import Any, Dict, Tuple, List, Optional
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
@@ -63,6 +63,78 @@ def _extract_lr(est):
             if isinstance(step, LogisticRegression):
                 return step
     return None
+
+
+def apply_feature_filters(
+    X: np.ndarray,
+    feature_names: List[str],
+    allow: Optional[List[str]] = None,
+    deny: Optional[List[str]] = None,
+):
+    """Apply simple allow/deny filters to feature matrix and names.
+
+    Returns (X_filtered, filtered_feature_names, mask, meta_dict)
+    where mask is a boolean array over the original feature order.
+    """
+    allow = list(dict.fromkeys(f for f in (allow or []) if f))
+    deny = list(dict.fromkeys(f for f in (deny or []) if f))
+    if not allow and not deny:
+        mask = np.ones(len(feature_names), dtype=bool)
+        meta = {
+            "allow": [],
+            "deny": [],
+            "original_feature_count": len(feature_names),
+            "kept_feature_count": len(feature_names),
+            "dropped_feature_count": 0,
+            "dropped_features": [],
+            "applied_by": "eval_kfold.py",
+        }
+        return X, feature_names, mask, meta
+
+    if feature_names is None:
+        raise SystemExit("Feature filtering requires feature_names in the NPZ.")
+
+    names = list(feature_names)
+    original_count = len(names)
+    name_set = set(names)
+
+    mask = np.ones(original_count, dtype=bool)
+    missing_allow: List[str] = []
+    missing_deny: List[str] = []
+
+    if allow:
+        allow_set = set(allow)
+        mask = np.array([n in allow_set for n in names], dtype=bool)
+        missing_allow = sorted(allow_set - name_set)
+
+    if deny:
+        deny_set = set(deny)
+        missing_deny = sorted(deny_set - name_set)
+        mask &= np.array([n not in deny_set for n in names], dtype=bool)
+
+    kept_names = [n for n, keep in zip(names, mask) if keep]
+    dropped_names = [n for n, keep in zip(names, mask) if not keep]
+
+    if not kept_names:
+        raise SystemExit("Feature filtering removed all columns; adjust --allow/--deny.")
+
+    X_filtered = X[:, mask]
+
+    meta = {
+        "allow": allow,
+        "deny": deny,
+        "original_feature_count": original_count,
+        "kept_feature_count": len(kept_names),
+        "dropped_feature_count": len(dropped_names),
+        "dropped_features": dropped_names,
+        "applied_by": "eval_kfold.py",
+    }
+    if missing_allow:
+        meta["missing_from_allow"] = missing_allow
+    if missing_deny:
+        meta["missing_from_deny"] = missing_deny
+
+    return X_filtered, kept_names, mask, meta
 
 
 # ---------- Threshold selection ----------
@@ -211,6 +283,9 @@ def train_final_and_eval(
     feature_fingerprint: Optional[str] = None,
     featurization_meta: Optional[Dict] = None,
     tag: Optional[str] = None,
+    feature_mask: Optional[np.ndarray] = None,
+    feature_config_dict: Optional[Dict[str, Any]] = None,
+    feature_filter_meta: Optional[Dict[str, Any]] = None,
 ):
     clf = make_clf(args, bestC) if args is not None else LogisticRegression(max_iter=1000, class_weight="balanced", C=bestC)
     clf.fit(X, y)
@@ -228,12 +303,22 @@ def train_final_and_eval(
         "tag": tag,
         "use_embed_alignment": bool(getattr(args, "use_embed_alignment", False)),
     })
+    if feature_config_dict:
+        report["feature_filter"] = feature_config_dict
+    if feature_filter_meta:
+        report["feature_filter_meta"] = feature_filter_meta
     if featurization_meta is not None:
         report["featurization_meta"] = featurization_meta
 
     if test_npz:
         t = np.load(test_npz, allow_pickle=True)
         Xt, yt = t["X"], t["y"]
+        if feature_mask is not None:
+            if Xt.shape[1] != feature_mask.shape[0]:
+                raise SystemExit(
+                    f"Test NPZ shape {Xt.shape[1]} does not match original feature count {feature_mask.shape[0]}"
+                )
+            Xt = Xt[:, feature_mask]
         yprob = clf.predict_proba(Xt)[:, 1]
         yhat = (yprob >= final_threshold).astype(int)
         report["test"] = dict(
@@ -291,6 +376,8 @@ def train_final_and_eval(
             tag=tag,
             use_embed_alignment=bool(getattr(args, "use_embed_alignment", False)),
         )
+        if feature_config_dict:
+            payload["feature_config"] = feature_config_dict
         with open(save_model, "wb") as f:
             pickle.dump(payload, f)
 
@@ -355,12 +442,59 @@ def main():
                     help="Optional JSON with featurization settings used upstream (feature_config, metrics_config, boolean_allowlist). Will be embedded in the saved model payload.")
     ap.add_argument("--tag", default=None,
                     help="Optional freeform tag to store in the saved payload/report (e.g., a data/version label).")
+    ap.add_argument("--allow", nargs="*", default=None,
+                    help="Exact feature names to keep (applied after loading --train-npz). If provided, only these columns remain.")
+    ap.add_argument("--deny", nargs="*", default=None,
+                    help=("Exact feature names to drop (applied after loading --train-npz). "
+                          "Columns listed here are removed before training/eval."))
     args = ap.parse_args()
 
     npz = np.load(args.train_npz, allow_pickle=True)
     X, y = npz["X"], npz["y"]
     # Feature names & fingerprint
     feature_names = list(npz["feature_names"]) if "feature_names" in npz else None
+
+    def _normalize_feature_list(values: Optional[List[str]]) -> List[str]:
+        if not values:
+            return []
+        cleaned = [v.strip() for v in values if v and v.strip()]
+        return list(dict.fromkeys(cleaned))
+
+    allow_list = _normalize_feature_list(args.allow)
+    deny_list = _normalize_feature_list(args.deny)
+    feature_mask: Optional[np.ndarray] = None
+    filter_meta: Optional[Dict[str, Any]] = None
+    feature_config_dict: Optional[Dict[str, Any]] = None
+
+    if allow_list or deny_list:
+        if feature_names is None:
+            raise SystemExit("--allow/--deny requires feature_names in the NPZ")
+        X, feature_names, feature_mask, filter_meta = apply_feature_filters(
+            X,
+            feature_names,
+            allow=allow_list,
+            deny=deny_list,
+        )
+        feature_config_dict = {
+            "allowlist": allow_list,
+            "denylist": deny_list,
+            "allow_patterns": [],
+            "deny_patterns": [],
+        }
+        if filter_meta:
+            kept = filter_meta.get("kept_feature_count", X.shape[1])
+            orig = filter_meta.get("original_feature_count", X.shape[1])
+            dropped = filter_meta.get("dropped_feature_count", 0)
+            print(
+                f"Applied feature filter: kept {kept}/{orig} columns (dropped {dropped})."
+            )
+            if filter_meta.get("missing_from_allow"):
+                print(f"  [warn] Missing from allow: {filter_meta['missing_from_allow']}")
+            if filter_meta.get("missing_from_deny"):
+                print(f"  [warn] Missing from deny: {filter_meta['missing_from_deny']}")
+    else:
+        feature_mask = None
+
     def _fingerprint(names):
         if not names: return None
         s = "|".join(str(x) for x in names).encode("utf-8")
@@ -376,6 +510,11 @@ def main():
         except Exception as e:
             print(f"[warn] Failed to load --featurization-meta: {e}")
             featurization_meta = None
+
+    if filter_meta:
+        base_meta = dict(featurization_meta) if isinstance(featurization_meta, dict) else {}
+        base_meta["post_filter_feature_config"] = filter_meta
+        featurization_meta = base_meta
 
     bestCres, allres = run_cv(
         X, y,
@@ -406,6 +545,9 @@ def main():
         feature_fingerprint=feature_fp,
         featurization_meta=featurization_meta,
         tag=args.tag,
+        feature_mask=feature_mask,
+        feature_config_dict=feature_config_dict,
+        feature_filter_meta=filter_meta,
     )
 
     if "test" in report:

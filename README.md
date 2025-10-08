@@ -166,6 +166,7 @@ stratified k-fold cross-validation:
   --min-precision 0.90 --standardize --max-iter 2000 \
   --solver lbfgs --penalty l2 --class-weight balanced \
   --use-embed-alignment --seed 42 \
+  --deny unsupported_entity_count unsupported_mass \
   --save-model artifacts/lr_model_v1.pkl \
   --save-report artifacts/cv_report_v1.json \
   --featurization-meta artifacts/featurization_meta.json \
@@ -173,16 +174,60 @@ stratified k-fold cross-validation:
 ```
 
 Passing `--test-csv` in tandem with `--test-npz` lets the script join the
-`answer_type` column from the CSV and print a per-category breakdown.
+`answer_type` column from the CSV and print a per-category breakdown. Use the
+new `--allow`/`--deny` flags to keep or drop specific feature columns *after*
+loading the NPZ. The same mask is applied to the optional test NPZ so train/test
+stay aligned.
+
+Feature filtering notes:
+
+- `--deny unsupported_entity_count unsupported_mass` drops those columns while
+  leaving the rest untouched.
+- `--allow context_alignment.best_context_similarity numeric_match` keeps only
+  the listed feature names (and implicitly drops everything else).
+- Any filters applied are recorded in both `cv_report*.json` and the saved
+  model payload as `feature_filter` / `feature_config`. The provided
+  `featurization_meta.json` is also augmented with a
+  `post_filter_feature_config` block so inference code can reapply the exact
+  mask when reconstructing feature vectors.
 
 Outputs:
 
 * `artifacts/lr_model_v1.pkl` – pickled scikit-learn model + metadata.
 * `artifacts/cv_report_v1.json` – per-fold metrics, thresholds per C, test-set
   evaluation.
-* `artifacts/featurization_meta.json` – captures feature names and flags used
-  during training. Load this alongside the model to ensure runtime featurization
-  uses the identical configuration.
+* `artifacts/featurization_meta.json` – captures feature names, upstream
+  extractor toggles, and (if you used `--allow/--deny`) a
+  `post_filter_feature_config` describing which columns were removed. Load this
+  alongside the model to ensure runtime featurization uses the identical
+  configuration.
+
+### Feature reference & enabling flags
+
+The featurizer always produces the core lexical coverage signals and then
+optionally adds richer metrics based on the CLI flags you pass to
+`data_processing.py` (or to `create_dataset.sh`, which wraps the same flags).
+The table below summarises the main feature families, the columns they expand
+to, and how to turn them on.
+
+| Feature family | Example flattened columns | What it captures | Enable via |
+| --- | --- | --- | --- |
+| **Lexical coverage (default)** | `precision_token`, `recall_context`, `best_context_share`, `per_sentence__{len,mean,min,max}`, `unsupported_term_rate`, `unsupported_mass` | Token overlap between answer and retrieved context, including per-sentence precision and unsupported token counts | Always on (can be disabled by editing `metrics_config` keys) |
+| **Context statistics (default)** | `best_context_len`, `num_contexts`, `avg_ctx_len_tokens`, `supported_topk_impact`, `unsupported_to_supported_ratio` | Quick diagnostics about retrieval depth and the balance of supported vs unsupported terms | Always on |
+| **Numeric grounding** | `numeric_match`, `unsupported_numeric_rate`, `unsupported_numbers__len` | Agreement between answer numbers and the retrieved numeric evidence | Always on |
+| **Entity grounding** | `entity_match.MONEY__len`, `supported_entities.by_type.DATE`, `unsupported_entity_count`, `entity_match.overall` | Typed entity alignment between answer and context; per-type counts and overall ratio | `--enable-entity-report` (default off) |
+| **POS-aware support** | `content_precision_token`, `content_term_support_rate`, `content_unsupported_mass`, `head_noun_support_rate` | Overlap restricted to content words / head nouns using spaCy POS tags | `--enable-pos-metrics` (requires spaCy) |
+| **Inference detector** | `inference_score`, `inference_likely_bool` | Heuristic that fires when answers look inferred (low lexical match, high typed match, decent semantic similarity) | `--enable-inference-signal` |
+| **QA lexical alignment** | `qr_alignment.cosine_tfidf`, `qr_alignment.answer_covers_question` | TF-IDF similarity between the question and answer and how completely the answer covers the question terms | Always on |
+| **QA semantic alignment** | `qr_alignment.cosine_embed`, `qr_alignment.answer_covers_question_sem` | MiniLM embedding similarity between question and answer | Enabled automatically when `sentence-transformers` MiniLM model is available (record `--use-embed-alignment` for bookkeeping) |
+| **Answer↔context semantic alignment** | `context_alignment.answer_context_similarity`, `context_alignment.best_context_similarity` | Embedding similarity between the answer and each retrieved context chunk | Same as above (requires MiniLM embeddings) |
+| **Per-type entity lengths** | `entity_match.DATE__len`, `entity_match.PERCENT__len`, etc. | Number of supported entities per type in the answer text | Automatically included when `--enable-entity-report` is set |
+| **Boolean allowlist** | `inference_likely_bool`, `inference_likely` | Booleans flattened to 0/1 when allowlisted | Allowlist managed by `data_processing.py` (defaults include `inference_likely`) |
+
+Lists (e.g., unsupported term details) are flattened with suffixes like
+`__len`, `__mean`, `__min`, `__max`. If you need to gate individual metrics you
+can extend `metrics_config` in `shared_config.py` or pass overrides like
+`--prefer-deterministic`/`--enable-types` to control the extractor.
 
 Recent run highlights (train_v3/test_v3):
 
