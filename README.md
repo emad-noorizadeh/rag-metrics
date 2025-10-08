@@ -169,6 +169,7 @@ stratified k-fold cross-validation:
   --deny unsupported_entity_count unsupported_mass \
   --save-model artifacts/lr_model_v1.pkl \
   --save-report artifacts/cv_report_v1.json \
+  --save-predictions artifacts/predictions_v1.csv \
   --featurization-meta artifacts/featurization_meta.json \
   --tag "v1.0-trainset_v3"
 ```
@@ -201,6 +202,9 @@ Outputs:
   `post_filter_feature_config` describing which columns were removed. Load this
   alongside the model to ensure runtime featurization uses the identical
   configuration.
+* `predictions.csv` (optional via `--save-predictions`) – per-row test outputs
+  with question/answer text, ground-truth label, predicted label, probability,
+  and the top 10 contributing features for each prediction.
 
 ### Feature reference & enabling flags
 
@@ -269,17 +273,29 @@ Tip: feed the flagged features into `DENY_FEATURES` in `create_dataset.sh` or
 pass them to `eval_kfold.py --deny` so training and inference stay aligned after
 pruning.
 
-Recent run highlights (train_v3/test_v3):
+## Tools
 
-| Metric | CV (C=3.0) | Test |
-|--------|------------|------|
-| F1     | 0.577      | 0.931|
-| Precision | 0.748  | 0.904|
-| Recall | 0.586      | 0.959|
+### `scripts/merge_npz_features.py`
 
-Top contributing features showed the expected importance shifts once DATE
-features were re-enabled (e.g., `entity_match.presence_by_type.DATE` flipped to
-positive weight, DATE counts penalize misses).
+Merges two or more featurized datasets while keeping only the shared feature
+columns. This is handy when you want to combine runs produced with identical
+flags (or after trimming to a common schema).
+
+```
+python scripts/merge_npz_features.py \
+  --inputs data/processed/train_v1.npz data/processed/train_v4.npz \
+  --out-npz data/processed/train_merged.npz \
+  --out-csv data/processed/train_merged.csv
+```
+
+The script:
+
+- Loads each NPZ and verifies the presence of `X`, `y`, and `feature_names`.
+- Intersects the feature names across all inputs and reorders every matrix to
+  that shared column set.
+- Stacks the rows, writes a merged NPZ (with aligned feature names), and emits a
+  lightweight CSV preview for quick auditing.
+- Fails fast if there is no overlap or if an input is missing required arrays.
 
 ## Runtime Inference
 

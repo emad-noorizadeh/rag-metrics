@@ -28,6 +28,7 @@ Notes
 # --use-embed-alignment: recorded in artifacts (for reproducibility); features must already include embed metrics from data_processing.
 """
 import argparse, json, math, csv
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple, List, Optional
 
@@ -286,6 +287,7 @@ def train_final_and_eval(
     feature_mask: Optional[np.ndarray] = None,
     feature_config_dict: Optional[Dict[str, Any]] = None,
     feature_filter_meta: Optional[Dict[str, Any]] = None,
+    predictions_csv: Optional[str] = None,
 ):
     clf = make_clf(args, bestC) if args is not None else LogisticRegression(max_iter=1000, class_weight="balanced", C=bestC)
     clf.fit(X, y)
@@ -321,6 +323,9 @@ def train_final_and_eval(
             Xt = Xt[:, feature_mask]
         yprob = clf.predict_proba(Xt)[:, 1]
         yhat = (yprob >= final_threshold).astype(int)
+
+        row_metadata: List[Dict[str, Any]] = []
+        answer_types: List[str] = []
         report["test"] = dict(
             f1=float(f1_score(yt, yhat)),
             pr_auc=float(average_precision_score(yt, yprob)),
@@ -331,12 +336,30 @@ def train_final_and_eval(
         )
         if test_csv:
             try:
-                answer_types: List[str] = []
                 with open(test_csv, "r", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
-                    for row in reader:
+                    for idx_row, row in enumerate(reader):
                         val = row.get("answer_type")
                         answer_types.append(val.strip() if val else "unknown")
+                        meta_entry = {
+                            "row_id": idx_row,
+                            "q": None,
+                            "a": None,
+                            "answer_type": answer_types[-1],
+                        }
+                        q_raw = row.get("q")
+                        a_raw = row.get("a")
+                        try:
+                            if q_raw:
+                                meta_entry["q"] = json.loads(q_raw)
+                        except Exception:
+                            meta_entry["q"] = q_raw
+                        try:
+                            if a_raw:
+                                meta_entry["a"] = json.loads(a_raw)
+                        except Exception:
+                            meta_entry["a"] = a_raw
+                        row_metadata.append(meta_entry)
                 if len(answer_types) == len(yt):
                     per_cat = {}
                     for cat in sorted(set(answer_types)):
@@ -358,6 +381,69 @@ def train_final_and_eval(
                     )
             except Exception as exc:
                 report["test"]["by_answer_type_warning"] = f"Failed to compute breakdown: {exc}"
+
+        # Optionally dump detailed predictions
+        if predictions_csv:
+            if not test_csv:
+                raise SystemExit("--save-predictions requires --test-csv so we can recover question/answer metadata")
+
+            lr_inner = _extract_lr(clf)
+            contributions: Optional[np.ndarray] = None
+            coef: Optional[np.ndarray] = None
+
+            if lr_inner is not None and hasattr(lr_inner, "coef_"):
+                coef = lr_inner.coef_.ravel()
+                Xt_for_lr = Xt
+                try:
+                    if hasattr(clf, "__getitem__"):
+                        transformer = clf[:-1]
+                        if hasattr(transformer, "transform"):
+                            Xt_for_lr = transformer.transform(Xt)
+                except Exception:
+                    Xt_for_lr = Xt
+                try:
+                    contributions = Xt_for_lr * coef
+                except Exception:
+                    contributions = None
+
+            fields = [
+                "row_id",
+                "question",
+                "answer",
+                "answer_type",
+                "y_true",
+                "y_pred",
+                "probability",
+                "top_features",
+            ]
+            Path(predictions_csv).parent.mkdir(parents=True, exist_ok=True)
+            with open(predictions_csv, "w", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fields)
+                writer.writeheader()
+                for idx_sample in range(len(yt)):
+                    meta = row_metadata[idx_sample] if idx_sample < len(row_metadata) else {"row_id": idx_sample}
+                    top_feats: List[Dict[str, Any]] = []
+                    if contributions is not None and feature_names is not None and coef is not None:
+                        contrib_row = contributions[idx_sample]
+                        feature_values = Xt[idx_sample]
+                        order = np.argsort(np.abs(contrib_row))[-10:][::-1]
+                        for j in order:
+                            top_feats.append({
+                                "feature": feature_names[j],
+                                "value": float(feature_values[j]),
+                                "coefficient": float(coef[j]),
+                                "contribution": float(contrib_row[j]),
+                            })
+                    writer.writerow({
+                        "row_id": meta.get("row_id", idx_sample),
+                        "question": meta.get("q", ""),
+                        "answer": meta.get("a", ""),
+                        "answer_type": meta.get("answer_type", answer_types[idx_sample] if idx_sample < len(answer_types) else ""),
+                        "y_true": int(yt[idx_sample]),
+                        "y_pred": int(yhat[idx_sample]),
+                        "probability": float(yprob[idx_sample]),
+                        "top_features": json.dumps(top_feats),
+                    })
 
     if save_model:
         os.makedirs(os.path.dirname(save_model) or ".", exist_ok=True)
@@ -431,6 +517,7 @@ def main():
     ap.add_argument("--min-precision", type=float, default=None, help="Require precision >= this during threshold pick")
     ap.add_argument("--save-model", default=None, help="Pickle path to save fitted LR + threshold")
     ap.add_argument("--save-report", default=None, help="JSON path to save CV summary + test metrics")
+    ap.add_argument("--save-predictions", default=None, help="CSV path to dump per-row test predictions (requires --test-csv)")
     ap.add_argument("--solver", default="lbfgs", choices=["lbfgs","liblinear","saga"])
     ap.add_argument("--penalty", default="l2", choices=["l2","l1","none"])
     ap.add_argument("--max-iter", type=int, default=1000)
@@ -548,6 +635,7 @@ def main():
         feature_mask=feature_mask,
         feature_config_dict=feature_config_dict,
         feature_filter_meta=filter_meta,
+        predictions_csv=args.save_predictions,
     )
 
     if "test" in report:
