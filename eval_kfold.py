@@ -575,10 +575,17 @@ def main():
             print(
                 f"Applied feature filter: kept {kept}/{orig} columns (dropped {dropped})."
             )
+            print(f"  allowlist: {allow_list or '[]'}")
+            print(f"  denylist: {deny_list or '[]'}")
+            print(f"  resulting feature set ({len(feature_names)} columns):")
+            preview_limit = 20
+            if len(feature_names) > preview_limit:
+                preview = feature_names[:preview_limit]
+                print(f"    {preview} ... (and {len(feature_names) - preview_limit} more)")
+            else:
+                print(f"    {feature_names}")
             if filter_meta.get("missing_from_allow"):
                 print(f"  [warn] Missing from allow: {filter_meta['missing_from_allow']}")
-            if filter_meta.get("missing_from_deny"):
-                print(f"  [warn] Missing from deny: {filter_meta['missing_from_deny']}")
     else:
         feature_mask = None
 

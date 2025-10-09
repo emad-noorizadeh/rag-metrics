@@ -1117,13 +1117,49 @@ def context_utilization_report_with_entities(
         semantic_gap = round((context_align["answer_context_similarity"] or 0.0) * (precision_token / max(1, best_len)), 4)
 
     per_sentence_similarity = None
-    if per_sentence and best_context_sim is not None:
-        per_sentence_similarity = round(best_context_sim / max(1, len(per_sentence)), 4)
+    per_sentence_bins: Dict[str, Optional[float]] = {
+        "per_sentence_semantic_alignment_low": None,
+        "per_sentence_semantic_alignment_medium": None,
+        "per_sentence_semantic_alignment_high": None,
+    }
+    if per_sentence:
+        if best_context_sim is not None:
+            per_sentence_similarity = round(best_context_sim / max(1, len(per_sentence)), 4)
+        thresholds = {
+            "per_sentence_semantic_alignment_low": 0.3,
+            "per_sentence_semantic_alignment_medium": 0.6,
+        }
+        counts = {key: 0 for key in per_sentence_bins}
+        total_sent = 0
+        for ps_val in per_sentence:
+            if ps_val is None:
+                continue
+            try:
+                sem = float(ps_val)
+            except (TypeError, ValueError):
+                continue
+            total_sent += 1
+            if sem < thresholds["per_sentence_semantic_alignment_low"]:
+                counts["per_sentence_semantic_alignment_low"] += 1
+            elif sem < thresholds["per_sentence_semantic_alignment_medium"]:
+                counts["per_sentence_semantic_alignment_medium"] += 1
+            else:
+                counts["per_sentence_semantic_alignment_high"] += 1
+        if total_sent > 0:
+            for key in counts:
+                per_sentence_bins[key] = round(counts[key] / total_sent, 4)
 
     qa_embed_similarity = embed_align.get("cosine_embed") if embed_align else None
     novelty_ratio = None
     if qa_embed_similarity is not None and qa_embed_similarity > 0:
         novelty_ratio = round(precision_token / qa_embed_similarity, 4)
+
+    coverage_gap = None
+    best_context_sim_for_gap = context_align.get("best_context_similarity")
+    if best_context_sim_for_gap is not None:
+        coverage_gap = round(max(0.0, qr_answer_coverage - best_context_sim_for_gap), 4)
+    elif qr_answer_coverage is not None:
+        coverage_gap = round(qr_answer_coverage, 4)
 
     if use_embed_alignment and embed_align["cosine_embed"] is not None:
         parts.append(f"Q↔A embed {round(embed_align['cosine_embed'], 2)}")
@@ -1142,6 +1178,10 @@ def context_utilization_report_with_entities(
         "supported_terms": supported_terms,
         "supported_terms_per_sentence": supported_terms_per_sentence,
         "per_sentence": per_sentence,
+        "per_sentence_semantic_alignment": per_sentence_similarity,
+        "per_sentence_semantic_alignment_low_frac": per_sentence_bins["per_sentence_semantic_alignment_low"],
+        "per_sentence_semantic_alignment_medium_frac": per_sentence_bins["per_sentence_semantic_alignment_medium"],
+        "per_sentence_semantic_alignment_high_frac": per_sentence_bins["per_sentence_semantic_alignment_high"],
         "qr_alignment": {
             "cosine_tfidf": round(qr_cosine, 4),
             "answer_covers_question": round(qr_answer_coverage, 4),
@@ -1155,6 +1195,7 @@ def context_utilization_report_with_entities(
         "semantic_gap": semantic_gap,
         "per_sentence_semantic_alignment": per_sentence_similarity,
         "answer_novelty_ratio": novelty_ratio,
+        "qa_context_coverage_gap": coverage_gap,
         "unsupported_terms": unsupported,
         "unsupported_terms_per_sentence": unsupported_ps,
         "unsupported_numbers": unsupported_nums,
