@@ -138,6 +138,34 @@ def apply_feature_filters(
     return X_filtered, kept_names, mask, meta
 
 
+def reproject_to_feature_order(
+    X: np.ndarray,
+    current_names: Optional[List[str]],
+    target_names: Optional[List[str]],
+) -> Tuple[np.ndarray, Optional[List[str]], Dict[str, List[str]]]:
+    """Align columns of X with target_names, inserting zeros for missing ones."""
+    info = {"added": [], "dropped": []}
+    if target_names is None or current_names is None or current_names == target_names:
+        return X, current_names, info
+
+    target_index = {name: idx for idx, name in enumerate(target_names)}
+    current_index = {name: idx for idx, name in enumerate(current_names)}
+
+    reordered = np.zeros((X.shape[0], len(target_names)), dtype=X.dtype)
+    for j, name in enumerate(target_names):
+        idx = current_index.get(name)
+        if idx is None:
+            info["added"].append(name)
+        else:
+            reordered[:, j] = X[:, idx]
+
+    for name in current_names:
+        if name not in target_index:
+            info["dropped"].append(name)
+
+    return reordered, target_names, info
+
+
 # ---------- Threshold selection ----------
 def pick_threshold(
     y_true: np.ndarray,
@@ -315,12 +343,14 @@ def train_final_and_eval(
     if test_npz:
         t = np.load(test_npz, allow_pickle=True)
         Xt, yt = t["X"], t["y"]
-        if feature_mask is not None:
-            if Xt.shape[1] != feature_mask.shape[0]:
-                raise SystemExit(
-                    f"Test NPZ shape {Xt.shape[1]} does not match original feature count {feature_mask.shape[0]}"
-                )
-            Xt = Xt[:, feature_mask]
+        test_feature_names = list(t["feature_names"]) if "feature_names" in t else None
+
+        Xt, _, align_info = reproject_to_feature_order(Xt, test_feature_names, feature_names)
+        if align_info["added"]:
+            print(f"[info] Test NPZ missing columns filled with zeros: {align_info['added']}")
+        if align_info["dropped"]:
+            print(f"[info] Test NPZ had extra columns dropped: {align_info['dropped']}")
+
         yprob = clf.predict_proba(Xt)[:, 1]
         yhat = (yprob >= final_threshold).astype(int)
 
@@ -586,6 +616,7 @@ def main():
                 print(f"    {feature_names}")
             if filter_meta.get("missing_from_allow"):
                 print(f"  [warn] Missing from allow: {filter_meta['missing_from_allow']}")
+        feature_mask = None
     else:
         feature_mask = None
 
