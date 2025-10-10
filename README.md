@@ -347,6 +347,46 @@ Impact matrix details:
   scores indicate features that help TP while staying quiet in FN rows. (In the
   heatmap, we plot `-norm_fn` so FN-heavy features appear below the centreline.)
 
+### Reporting utilities
+
+The whitepaper relies on a few helper scripts that turn training outputs into
+reusable CSV/TeX assets. They are optional during modeling but keep the report
+in sync with the latest metrics.
+
+1. `scripts/generate_stats_from_csv.py` — scans a featurized CSV and emits
+   `stats_<prefix>.json` with total label counts plus positive `answer_type`
+   breakdowns.
+   ```bash
+   python scripts/generate_stats_from_csv.py data/processed/train_v6.csv
+   ```
+
+2. `scripts/stats_to_csv.py` — converts one or more `stats_*.json` files into the
+   tabular CSVs consumed by LaTeX (train/test splits and answer-type counts).
+   ```bash
+   python scripts/stats_to_csv.py \
+     train=report/files/stats_train_v6.json \
+     test=report/files/stats_test_v6.json \
+     --out-dir report/files
+   ```
+   Outputs: `figure_train_test_stats.csv`, `figure_answer_type_distribution.csv`,
+   and `figure_answer_type_distribution_long.csv` in the chosen `--out-dir`.
+
+3. `scripts/generate_estimation_assets.py` — distills `cv_report.json` and
+   `feature_report.json` into report-ready artifacts: per-fold metrics,
+   answer-type performance, top coefficients, and a `estimation_summary.tex`
+   macro file.
+   ```bash
+   python scripts/generate_estimation_assets.py \
+     --cv artifacts/cv_report_v1.json \
+     --features artifacts/feature_report.json \
+     --out-dir report/files
+   ```
+   Outputs: `estimation_cv_folds.csv`, `estimation_test_answer_type.csv`,
+   `estimation_top_features.csv`, and `estimation_summary.{json,tex}`.
+
+Run these utilities after retraining so the LaTeX report reflects the most recent
+training run.
+
 ## Runtime Inference
 
 Use the same featurization pipeline and the saved artifacts:
