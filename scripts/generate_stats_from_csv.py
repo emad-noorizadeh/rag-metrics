@@ -7,7 +7,17 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+import sys
 from typing import Any, Dict, List
+
+
+def _ensure_repo_root() -> None:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+
+_ensure_repo_root()
 
 from stats_utils import save_dataset_stats
 
@@ -64,4 +74,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
