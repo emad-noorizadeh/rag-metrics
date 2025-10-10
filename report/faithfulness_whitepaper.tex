@@ -2,7 +2,6 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{csvsimple}
 \usepackage{array}
 \usepackage{hyperref}
 \usepackage{tikz}
@@ -89,22 +88,22 @@ The flattened feature space created in \texttt{data\_processing.py} combines lex
 Across all categories the featurizer currently emits 84 scalar signals, giving the classifier multiple views of each failure pattern. The training script \texttt{k-fold evaluation} ranks features by contribution, while \texttt{feature analyzer} inspects coefficient stability to ensure each signal generalizes across question domains.
 
 \section{Training Dataset}
-We curated 3{,}000 diverse question--answer--context triples, labelled by an expert LLM with rationale traces. The data spans financial products, services, tax policies, fees to expose the guardrails to domain shifts. Figure~\ref{fig:train-test-stats} summarizes the train/test split using the CSV derived from the stats exports, while Table~\ref{tab:test-answer-counts} reports the positive answer-type mix recorded alongside those totals.
+We curated 3{,}000 diverse question--answer--context triples, labelled by an expert LLM with rationale traces. The data spans financial products, services, tax policies, fees to expose the guardrails to domain shifts. Table~\ref{tab:train-test-stats} summarizes the train/test split using the CSV derived from the stats exports, while Table~\ref{tab:test-answer-counts} reports the positive answer-type mix recorded alongside those totals.
 
-\begin{figure}[ht]
+\begin{table}[ht]
   \centering
   \renewcommand{\arraystretch}{1.2}
-  \csvreader[
-    head to column names,
-    tabular=>{\raggedright\arraybackslash}p{2.6cm}*{3}{>{\centering\arraybackslash}p{2.2cm}},
-    table head=\toprule \textbf{Split} & \textbf{Total} & \textbf{Positive} & \textbf{Negative} \\\midrule,
-    late after line=\\,
-    table foot=\bottomrule
-  ]{files/figure_train_test_stats.csv}{}
-  {\Split & \Total & \Positive & \Negative}
-  \caption{Train and test label counts generated from the featurization stats. Positives correspond to faithful answers; negatives bundle partially faithful and unfaithful rows.}
-  \label{fig:train-test-stats}
-\end{figure}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    \textbf{Split} & \textbf{Total} & \textbf{Positive} & \textbf{Negative} \\
+    \midrule
+    Train & 0 & 0 & 0 \\
+    Test & 0 & 0 & 0 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Train and test label counts generated from the featurization stats. Replace placeholders with actual counts.}
+  \label{tab:train-test-stats}
+\end{table}
 
 Training rows preserve the self-reflection prompts and rationales so that the distilled classifier can observe both paraphrased admissions of uncertainty and confident but incorrect claims. The validation slice is used for hyper-parameter tuning (regularization, class weights), and the test set stays untouched until final evaluation.
 
@@ -114,15 +113,18 @@ We fit a logistic regression classifier on \EstTrainSize training rows using str
 \begin{table}[ht]
   \centering
   \renewcommand{\arraystretch}{1.15}
-  \csvreader[
-    head to column names,
-    tabular=>{\raggedright\arraybackslash}p{1.2cm}*{7}{>{\centering\arraybackslash}p{1.75cm}},
-    table head=\toprule \textbf{Fold} & \textbf{F$_1$} & \textbf{Precision} & \textbf{Recall} & \textbf{PR-AUC} & \textbf{ROC-AUC} & \textbf{Brier} & \textbf{Threshold} \\\midrule,
-    late after line=\\,
-    table foot=\bottomrule
-  ]{files/estimation_cv_folds.csv}{}
-  {\csvcoli & \csvcolii & \csvcoliii & \csvcoliv & \csvcolv & \csvcolvi & \csvcolvii & \csvcolviii}
-  \caption{Cross-validation fold performance at the selected \(C\). Metrics are computed on held-out validation splits.}
+  \begin{tabular}{@{}lccccccc@{}}
+    \toprule
+    \textbf{Fold} & \textbf{F$_1$} & \textbf{Precision} & \textbf{Recall} & \textbf{PR-AUC} & \textbf{ROC-AUC} & \textbf{Brier} & \textbf{Threshold} \\
+    \midrule
+    1 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+    2 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+    3 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+    4 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+    5 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Cross-validation fold performance at the selected \(C\). Replace the placeholders with the metrics from your evaluation.}
   \label{tab:cv-folds}
 \end{table}
 
@@ -131,15 +133,14 @@ Final evaluation on the held-out test set achieved F$_1$=\EstTestFOne{}, precisi
 \begin{table}[ht]
   \centering
   \renewcommand{\arraystretch}{1.15}
-  \csvreader[
-    head to column names,
-    tabular=>{\raggedright\arraybackslash}p{2.8cm}*{5}{>{\centering\arraybackslash}p{1.75cm}},
-    table head=\toprule \textbf{Answer type} & \textbf{Support} & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} & \textbf{PR-AUC} \\\midrule,
-    late after line=\\,
-    table foot=\bottomrule
-  ]{files/estimation_test_answer_type.csv}{}
-  {\csvcoli & \csvcolii & \csvcoliii & \csvcoliv & \csvcolv & \csvcolvi}
-  \caption{Held-out test metrics grouped by \texttt{answer\_type}. Empty cells indicate the metric is undefined because only a single class was observed.}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    \textbf{Answer type} & \textbf{Support} & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} & \textbf{PR-AUC} \\
+    \midrule
+    Unknown & 0 & 0.00 & 0.00 & 0.00 & 0.00 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Held-out test metrics grouped by \texttt{answer\_type}. Replace the placeholder values with those from your evaluation report.}
   \label{tab:test-answer-type}
 \end{table}
 
@@ -148,15 +149,18 @@ To interpret the fitted model we inspect the largest-magnitude coefficients. Tab
 \begin{table}[ht]
   \centering
   \renewcommand{\arraystretch}{1.1}
-  \csvreader[
-    head to column names,
-    tabular={p{1.9cm}c>{\raggedright\arraybackslash}p{8.4cm}>{\raggedleft\arraybackslash}p{1.5cm}},
-    table head=\toprule \textbf{Direction} & \textbf{Rank} & \textbf{Feature} & \textbf{Coeff.} \\\midrule,
-    late after line=\\,
-    table foot=\bottomrule
-  ]{files/estimation_top_features.csv}{}
-  {\csvcoli & \csvcolii & \csvcoliii & \csvcoliv}
-  \caption{Top logistic-regression coefficients from the distilled classifier. Positive entries boost the faithful class; negative entries suppress it.}
+  \begin{tabular}{@{}lclc@{}}
+    \toprule
+    \textbf{Direction} & \textbf{Rank} & \textbf{Feature} & \textbf{Coeff.} \\
+    \midrule
+    positive & 1 & \texttt{feature\_placeholder} & 0.00 \\
+    positive & 2 & \texttt{feature\_placeholder} & 0.00 \\
+    positive & 3 & \texttt{feature\_placeholder} & 0.00 \\
+    negative & 1 & \texttt{feature\_placeholder} & 0.00 \\
+    negative & 2 & \texttt{feature\_placeholder} & 0.00 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Top logistic-regression coefficients from the distilled classifier. Replace the placeholders with the strongest positive and negative signals.}
   \label{tab:top-features}
 \end{table}
 
@@ -175,30 +179,30 @@ We benchmark the distilled classifier against two widely used evaluation toolkit
 \begin{table}[ht]
   \centering
   \renewcommand{\arraystretch}{1.2}
-  \csvreader[
-    head to column names,
-    tabular={>{\raggedright\arraybackslash}p{4.2cm}*{3}{>{\centering\arraybackslash}p{2.2cm}}},
-    table head=\toprule \textbf{System} & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} \\\midrule,
-    late after line=\\,
-    table foot=\bottomrule
-  ]{files/performance_benchmark.csv}{}
-  {\csvcoli & \csvcolii & \csvcoliii & \csvcoliv}
-  \caption{Benchmark comparison on the held-out test set. The distilled classifier uses the features described in Section~\ref{tab:cv-folds}; RAGAS and Galileo scores come from running their default configurations on the same examples.}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    \textbf{System} & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} \\
+    \midrule
+    Distilled Classifier & 0.00 & 0.00 & 0.00 \\
+    RAGAS & 0.00 & 0.00 & 0.00 \\
+    Galileo & 0.00 & 0.00 & 0.00 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Benchmark comparison on the held-out test set. Replace the placeholder values with the metrics from your evaluation.}
   \label{tab:benchmark}
 \end{table}
 
 \begin{table}[ht]
   \centering
   \renewcommand{\arraystretch}{1.15}
-  \csvreader[
-    head to column names,
-    tabular={>{\raggedright\arraybackslash}p{4.0cm}*{4}{>{\centering\arraybackslash}p{2.0cm}}},
-    table head=\toprule \textbf{Answer type} & \textbf{Support} & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} \\\midrule,
-    late after line=\\,
-    table foot=\bottomrule
-  ]{files/estimation_test_answer_type.csv}{}
-  {\csvcoli & \csvcolii & \csvcoliii & \csvcoliv & \csvcolv}
-  \caption{Classifier performance by \texttt{answer\_type} on the held-out test set. Empty cells indicate the metric was undefined because only a single class was observed.}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    \textbf{Answer type} & \textbf{Support} & \textbf{Precision} & \textbf{Recall} & \textbf{F$_1$} \\
+    \midrule
+    Unknown & 0 & 0.00 & 0.00 & 0.00 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Classifier performance by \texttt{answer\_type} on the held-out test set. Replace the placeholders with the metrics from your evaluation.}
   \label{tab:test-answer-counts}
 \end{table}
 
