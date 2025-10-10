@@ -1,0 +1,4 @@
+Split,Examples,Faithful,PartiallyFaithful,Unfaithful
+Training,2100,960,630,510
+Validation,450,200,135,115
+Test,450,190,135,125

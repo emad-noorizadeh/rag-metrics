@@ -932,6 +932,7 @@ def context_utilization_report_with_entities(
                 "answer_context_similarity": None,
                 "best_context_similarity": None
             },
+            "qa_context_coverage_gap": round(qr_cov, 4),
             "unsupported_terms": _unsupported_terms(a_terms, [], idf),
             "unsupported_terms_per_sentence": _unsupported_terms_per_sentence(answer, [], idf),
             "unsupported_numbers": _unsupported_numbers(answer, [], config=ex_cfg),

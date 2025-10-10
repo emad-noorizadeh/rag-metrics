@@ -1,0 +1,4 @@
+System,Precision,Recall,F1
+Distilled Classifier,\EstTestPrecision,\EstTestRecall,\EstTestFOne
+RAGAS,0.71,0.59,0.64
+Galileo,0.76,0.62,0.68

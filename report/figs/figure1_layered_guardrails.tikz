@@ -1,0 +1,15 @@
+\begin{tikzpicture}[node distance=2.8cm, every node/.style={align=center, font=\small}]
+  \tikzset{stage/.style={rounded corners, draw=blue!60, fill=blue!10, line width=1.1pt, minimum width=3.2cm, minimum height=1.6cm, inner sep=4pt}}
+
+  \node[stage] (prompt) {RAG with\\Self-Reflection Metric};
+  \node[stage, right=2.8cm of prompt] (classifier) {Distilled LLM\\Faithfulness Classifier};
+  \node[stage, right=2.8cm of classifier] (factcheck) {Deterministic\\Fact Check};
+
+  \draw[->, line width=1pt] (prompt) -- node[midway, above=3pt]{\footnotesize Risk-ranked\\\footnotesize Rationale} (classifier);
+  \draw[->, line width=1pt] (classifier) -- node[midway, above=4pt]{\footnotesize Structured verdict} (factcheck);
+
+  \node[below=2.1cm of prompt, align=left] (input) {Question};
+  \node[below=2.1cm of factcheck, align=right] (output) {Layered-Guardrail\\Final Answer};
+  \draw[->, dashed, line width=0.8pt] (input) -- (prompt);
+  \draw[->, dashed, line width=0.8pt] (factcheck) -- (output);
+\end{tikzpicture}

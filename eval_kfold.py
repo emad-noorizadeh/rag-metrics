@@ -316,6 +316,7 @@ def train_final_and_eval(
     feature_config_dict: Optional[Dict[str, Any]] = None,
     feature_filter_meta: Optional[Dict[str, Any]] = None,
     predictions_csv: Optional[str] = None,
+    extra_report_fields: Optional[Dict[str, Any]] = None,
 ):
     clf = make_clf(args, bestC) if args is not None else LogisticRegression(max_iter=1000, class_weight="balanced", C=bestC)
     clf.fit(X, y)
@@ -339,6 +340,8 @@ def train_final_and_eval(
         report["feature_filter_meta"] = feature_filter_meta
     if featurization_meta is not None:
         report["featurization_meta"] = featurization_meta
+    if extra_report_fields:
+        report.update(extra_report_fields)
 
     if test_npz:
         t = np.load(test_npz, allow_pickle=True)
@@ -658,6 +661,28 @@ def main():
         print(f"  C={C:>5}: F1={m['f1']:.3f}  PR-AUC={m['pr_auc']:.3f}  ROC-AUC={m['roc_auc']:.3f}  "
               f"Prec={m['precision']:.3f}  Rec={m['recall']:.3f}  Thr~{m['thr']:.3f}")
 
+    cv_summary = {
+        "n_splits": args.n_splits,
+        "objective": args.objective,
+        "beta": args.beta if args.objective == "fbeta" else None,
+        "min_precision": args.min_precision,
+        "seed": args.seed,
+        "grid": {
+            str(C): {
+                "mean_metrics": res.mean_metrics,
+                "mean_threshold": res.mean_threshold,
+                "fold_metrics": res.fold_metrics,
+            }
+            for C, res in sorted(allres.items(), key=lambda kv: kv[0])
+        },
+        "selected": {
+            "C": bestCres.C,
+            "mean_threshold": bestCres.mean_threshold,
+            "mean_metrics": bestCres.mean_metrics,
+            "fold_metrics": bestCres.fold_metrics,
+        },
+    }
+
     print(f"\nSelected C={bestCres.C} with mean threshold ~{bestCres.mean_threshold:.3f}")
     clf, report = train_final_and_eval(
         X, y, feature_names,
@@ -674,6 +699,7 @@ def main():
         feature_config_dict=feature_config_dict,
         feature_filter_meta=filter_meta,
         predictions_csv=args.save_predictions,
+        extra_report_fields={"cv": cv_summary},
     )
 
     if "test" in report:

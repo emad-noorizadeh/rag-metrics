@@ -1,0 +1,11 @@
+Direction,Rank,Feature,Coefficient
+positive,1,\texttt{entity\_match.presence\_by\_type.DATE},1.97
+positive,2,\texttt{entity\_match.overall},1.94
+positive,3,\texttt{context\_alignment.best\_context\_similarity},1.88
+positive,4,\texttt{best\_context\_len},1.68
+positive,5,\texttt{qr\_alignment.answer\_covers\_question\_sem},1.56
+negative,1,\texttt{q\_len},-2.21
+negative,2,\texttt{supported\_topk\_impact},-1.94
+negative,3,\texttt{unsupported\_to\_supported\_ratio},-1.64
+negative,4,\texttt{context\_alignment.answer\_context\_similarity},-1.39
+negative,5,\texttt{avg\_ctx\_len\_tokens},-1.20

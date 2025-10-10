@@ -11,6 +11,7 @@ import logging
 
 from metric_utils import context_utilization_report_with_entities
 from shared_config import add_extractor_flags, metrics_config_from_args
+from stats_utils import save_dataset_stats
 
 # Silence plac/optparse deprecation noise triggered by spaCy CLI helpers under Python 3.10+
 warnings.filterwarnings(
@@ -477,10 +478,13 @@ def main():
     out_npz = f"{args.out_prefix}.npz"
     save_csv(X, y, names, meta, out_csv)
     save_npz(X, y, names, out_npz)
+    stats_path = save_dataset_stats(meta, args.out_prefix)
 
     print(f"✅ Saved {X.shape[0]} rows, {X.shape[1]} features")
     print(f"   CSV: {out_csv}")
     print(f"   NPZ: {out_npz}")
+    if stats_path:
+        print(f"   Stats: {stats_path}")
 
 if __name__ == "__main__":
     main()

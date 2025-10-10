@@ -1,0 +1,4 @@
+Layer,Precision,Recall,Fone
+Self-Reflection Metric,0.82,0.76,0.79
+Distilled Classifier,0.88,0.81,0.84
+Deterministic Fact Check,0.91,0.78,0.84
