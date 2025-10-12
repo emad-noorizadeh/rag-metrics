@@ -192,6 +192,26 @@ Feature filtering notes:
   `post_filter_feature_config` block so inference code can reapply the exact
   mask when reconstructing feature vectors.
 
+#### Hyper-parameter and threshold selection
+
+For every value listed in `--Cs`, the script runs stratified k-fold validation
+controlled by `--n-splits` and `--seed`. Inside each fold it:
+
+1. Fits the model on the training partition.
+2. Scores the validation partition, producing probabilities.
+3. Calls `pick_threshold`, which walks the precision–recall curve (via
+   `precision_recall_curve`) and evaluates the requested objective (default
+   F$_1$, configurable with `--objective`/`--beta`). Optional constraints such as
+   `--min-precision` are enforced here. The threshold that maximises the
+   objective for that fold is recorded alongside the per-fold metrics.
+
+After all folds complete for a given `C`, their metrics and thresholds are
+averaged. The outer grid search then selects the `C` whose averaged objective is
+highest; both the winning `C` and the mean threshold are stored in the saved
+`cv_report`. During the final training pass, the model is refit on the full
+training set using that `C`, and the single threshold applied to the held-out
+test set is the averaged value derived from cross-validation.
+
 Outputs:
 
 * `artifacts/lr_model_v1.pkl` – pickled scikit-learn model + metadata.

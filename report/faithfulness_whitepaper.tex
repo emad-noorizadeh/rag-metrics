@@ -88,7 +88,14 @@ The flattened feature space created in \texttt{data\_processing.py} combines lex
 Across all categories the featurizer currently emits 84 scalar signals, giving the classifier multiple views of each failure pattern. The training script \texttt{k-fold evaluation} ranks features by contribution, while \texttt{feature analyzer} inspects coefficient stability to ensure each signal generalizes across question domains.
 
 \section{Training Dataset}
-We curated 3{,}000 diverse question--answer--context triples, labelled by an expert LLM with rationale traces. The data spans financial products, services, tax policies, fees to expose the guardrails to domain shifts. Table~\ref{tab:train-test-stats} summarizes the train/test split using the CSV derived from the stats exports, while Table~\ref{tab:test-answer-counts} reports the positive answer-type mix recorded alongside those totals.
+
+We curated a dataset of 3{,}000 diverse question--answer--context triples, each annotated by an expert LLM with rationale traces to capture reasoning quality and justification patterns. The corpus intentionally blends \textbf{common}, \textbf{edge}, and \textbf{hard} cases---ranging from frequently asked financial queries to ambiguous or counterfactual scenarios designed to test guardrail robustness. 
+
+To ensure coverage of model failure patterns, a portion of the questions were generated using \textbf{adversarial prompting techniques}, targeting known \emph{hallucination, overconfidence, and reasoning drift} behaviors. These adversarial examples expose the model to its own blind spots and help the classifier learn discriminative signals between grounded and ungrounded responses.
+
+The data spans multiple domains, including \emph{financial products, services, tax policies, regulatory nuances, and fee structures}, ensuring broad exposure to domain shifts and linguistic variability. Questions vary in structure and difficulty: some require factual recall from context, others demand inference, numerical reasoning, or cross-sentence grounding. This diversity helps the downstream classifier generalize beyond surface cues and remain stable under semantic and contextual perturbations.
+
+Table~\ref{tab:train-test-stats} summarizes the train/test split generated from the featurization statistics, while Table~\ref{tab:test-answer-counts} details the positive answer-type mix observed in the dataset.
 
 \begin{table}[ht]
   \centering
@@ -105,8 +112,7 @@ We curated 3{,}000 diverse question--answer--context triples, labelled by an exp
   \label{tab:train-test-stats}
 \end{table}
 
-Training rows preserve the self-reflection prompts and rationales so that the distilled classifier can observe both paraphrased admissions of uncertainty and confident but incorrect claims. The validation slice is used for hyper-parameter tuning (regularization, class weights), and the test set stays untouched until final evaluation.
-
+Training examples preserve the full self-reflection prompts and rationale chains, enabling the distilled classifier to learn from both \textbf{paraphrased admissions of uncertainty} and \textbf{confident but incorrect} reasoning. The validation slice supports hyperparameter tuning (regularization, class weighting), while the held-out test set remains untouched until final evaluation to ensure unbiased performance reporting.
 \section{Estimation}
 We fit a logistic regression classifier on \EstTrainSize training rows using stratified \EstCvNSplits-fold cross-validation (seeded at \EstCvSeed) to sweep the inverse regularization strength \(C\). The search optimised \texttt{\EstCvObjective} and selected \(C = \EstBestC\) with a decision threshold of \EstFinalThreshold{}. Table~\ref{tab:cv-folds} summarises the per-fold validation metrics; the mean cross-validated F$_1$ was \EstCvFOne{}, with precision/recall of \EstCvPrecision{} and \EstCvRecall{}.
 
